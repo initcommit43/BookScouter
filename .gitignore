@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.eggs/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# PyInstaller build output
+build/
+dist/
+*.spec.bak
+
+# Local data / scraping results — nie gescrapte Daten committen
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# Env / secrets
+.env
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code / AI assistant files — never committed
+.claude/
+CLAUDE.md
+.claude.json
+.mcp.json
