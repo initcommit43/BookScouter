@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from bookscouter.scrapers.thalia import ThaliaScraper
+from bookscouter.scrapers.thalia import ThaliaDeScraper, ThaliaScraper
 
 SEARCH_HTML_WITH_HIT = """
 <html><body>
@@ -87,3 +87,21 @@ def test_scrape_search_request_failed(monkeypatch):
     result = ThaliaScraper().scrape("9783831041657")
 
     assert result.gefunden is False
+
+
+def test_de_scraper_uses_de_domain(monkeypatch):
+    requested_urls = []
+    responses = [FakeResponse(SEARCH_HTML_WITH_HIT), FakeResponse(DETAIL_HTML_WITH_PRICE)]
+
+    def fake_get(self, url, **kwargs):
+        requested_urls.append(url)
+        return responses.pop(0)
+
+    monkeypatch.setattr(ThaliaDeScraper, "_get", fake_get)
+
+    result = ThaliaDeScraper().scrape("9783831041657")
+
+    assert result.shop == "Thalia.de"
+    assert result.gefunden is True
+    assert requested_urls[0].startswith("https://www.thalia.de/suche")
+    assert requested_urls[1].startswith("https://www.thalia.de/shop/home/artikeldetails")

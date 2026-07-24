@@ -3,7 +3,9 @@
 import sys
 
 from bookscouter.db import connect, get_price_history, save_lookup
-from bookscouter.scrapers.thalia import ThaliaScraper
+from bookscouter.scrapers.thalia import ThaliaDeScraper, ThaliaScraper
+
+SCRAPERS = [ThaliaScraper, ThaliaDeScraper]
 
 
 def main() -> None:
@@ -14,23 +16,29 @@ def main() -> None:
         sys.exit(1)
 
     isbn = sys.argv[1]
-    scraper = ThaliaScraper()
-    result = scraper.scrape(isbn)
-
-    if not result.gefunden:
-        print(f"Nicht gefunden bei {scraper.shop_name} für ISBN {isbn}.")
-        sys.exit(1)
-
     conn = connect()
     history = get_price_history(conn, isbn)
-    print(f"{result.titel} - {result.shop}: {result.preis:.2f} EUR")
+    gefunden = False
+
+    for scraper_cls in SCRAPERS:
+        scraper = scraper_cls()
+        result = scraper.scrape(isbn)
+        if not result.gefunden:
+            print(f"Nicht gefunden bei {scraper.shop_name}.")
+            continue
+
+        gefunden = True
+        print(f"{result.titel} - {result.shop}: {result.preis:.2f} EUR")
+        save_lookup(conn, isbn=isbn, titel=result.titel, shop=result.shop, preis=result.preis)
+
     if history:
         print("Bisherige Preise:")
         for row in history:
             print(f"  {row['datum']}: {row['preis']:.2f} EUR ({row['shop']})")
 
-    save_lookup(conn, isbn=isbn, titel=result.titel, shop=result.shop, preis=result.preis)
     conn.close()
+    if not gefunden:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

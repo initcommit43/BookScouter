@@ -1,4 +1,8 @@
-"""Scraper für thalia.at: ISBN rein, Titel + Preis raus.
+"""Scraper für thalia.at/thalia.de: ISBN rein, Titel + Preis raus.
+
+Beide Domains laufen auf derselben Plattform (identische Struktur, teils
+unterschiedliche Preise), daher ein parametrisierter Scraper statt zwei
+Kopien.
 
 Thalia bietet keine ISBN-basierte Produkt-URL an. Der einzige Weg, eine ISBN
 einer Produktseite zuzuordnen, ist die Trefferliste unter /suche?sq=<isbn>.
@@ -13,19 +17,19 @@ from bs4 import BeautifulSoup
 
 from bookscouter.scrapers.base import Scraper, ScrapeResult
 
-BASE_URL = "https://www.thalia.at"
-SEARCH_URL = f"{BASE_URL}/suche"
-
 
 class ThaliaScraper(Scraper):
-    shop_name = "Thalia.at"
+    def __init__(self, base_url: str = "https://www.thalia.at", shop_name: str = "Thalia.at") -> None:
+        super().__init__()
+        self.shop_name = shop_name
+        self.base_url = base_url
 
     def scrape(self, isbn: str) -> ScrapeResult:
         not_found = ScrapeResult(
             shop=self.shop_name, isbn=isbn, titel=None, preis=None, gefunden=False
         )
 
-        search_response = self._get(SEARCH_URL, params={"sq": isbn})
+        search_response = self._get(f"{self.base_url}/suche", params={"sq": isbn})
         if not search_response.ok:
             return not_found
 
@@ -36,7 +40,7 @@ class ThaliaScraper(Scraper):
 
         detail_url = link["href"]
         if detail_url.startswith("/"):
-            detail_url = BASE_URL + detail_url
+            detail_url = self.base_url + detail_url
 
         detail_response = self._get(detail_url)
         if not detail_response.ok:
@@ -70,3 +74,8 @@ class ThaliaScraper(Scraper):
             if isinstance(data, dict) and data.get("@type") == "Book":
                 return data
         return None
+
+
+class ThaliaDeScraper(ThaliaScraper):
+    def __init__(self) -> None:
+        super().__init__(base_url="https://www.thalia.de", shop_name="Thalia.de")
