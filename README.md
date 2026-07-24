@@ -15,7 +15,7 @@ has cost over time.
 ## Tech stack
 
 - **Python** — the only language used across the project
-- **requests + BeautifulSoup** — scraping
+- **curl (via subprocess) + BeautifulSoup** — scraping (curl avoids TLS-fingerprint blocks some shops apply to Python HTTP clients)
 - **sqlite3** (standard library) — local storage, a single file
 - **customtkinter** — UI, pure Python without a server/browser
 - **PyInstaller** — distributed as a single `.exe`
