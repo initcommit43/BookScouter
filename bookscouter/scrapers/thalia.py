@@ -12,6 +12,7 @@ ausschließlich einzelne ISBNs auf gezielte Anfrage der Nutzerin/des Nutzers ab
 (kein Crawling, siehe plan.md) – daher wird das bewusst in Kauf genommen.
 """
 
+import html
 import json
 
 from bs4 import BeautifulSoup
@@ -59,7 +60,9 @@ class ThaliaScraper(Scraper):
         return ScrapeResult(
             shop=self.shop_name,
             isbn=isbn,
-            titel=titel,
+            # Die Titel im JSON-LD enthalten HTML-Entities ("Die Stra&szlig;e"),
+            # daher vor dem Speichern/Anzeigen dekodieren.
+            titel=html.unescape(titel),
             preis=float(preis_raw),
             gefunden=True,
         )

@@ -3,10 +3,17 @@
 import sys
 
 from bookscouter.db import connect, get_price_history, save_lookup
+from bookscouter.scrapers.morawa import MorawaScraper
 from bookscouter.scrapers.thalia import BuecherDeScraper, ThaliaDeScraper, ThaliaScraper
 from bookscouter.scrapers.waltscomicshop import WaltsComicShopScraper
 
-SCRAPERS = [ThaliaScraper, ThaliaDeScraper, BuecherDeScraper, WaltsComicShopScraper]
+SCRAPERS = [
+    ThaliaScraper,
+    ThaliaDeScraper,
+    BuecherDeScraper,
+    MorawaScraper,
+    WaltsComicShopScraper,
+]
 
 
 def main() -> None:

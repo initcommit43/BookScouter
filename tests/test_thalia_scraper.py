@@ -30,6 +30,18 @@ DETAIL_HTML_WITH_PRICE = """
 </body></html>
 """
 
+DETAIL_HTML_WITH_ENTITIES = """
+<html><body>
+<script type="application/ld+json">
+{
+    "@type": "Book",
+    "name": "Die Stra&szlig;e",
+    "offers": {"price": "26.50"}
+}
+</script>
+</body></html>
+"""
+
 DETAIL_HTML_WITHOUT_PRICE = """
 <html><body>
 <script type="application/ld+json">
@@ -56,6 +68,15 @@ def test_scrape_found(monkeypatch):
     assert result.preis == 13.90
     assert result.shop == "Thalia.at"
     assert result.isbn == "9783831041657"
+
+
+def test_scrape_decodes_html_entities_in_title(monkeypatch):
+    responses = [FakeResponse(SEARCH_HTML_WITH_HIT), FakeResponse(DETAIL_HTML_WITH_ENTITIES)]
+    monkeypatch.setattr(ThaliaScraper, "_get", lambda self, url, **kwargs: responses.pop(0))
+
+    result = ThaliaScraper().scrape("9783546100335")
+
+    assert result.titel == "Die Straße"
 
 
 def test_scrape_no_search_hit(monkeypatch):
