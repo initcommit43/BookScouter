@@ -4,9 +4,9 @@ A local desktop tool for entering a book ISBN and seeing prices across
 several online shops at a glance. Every lookup is stored locally, so price
 history for a title can be tracked over time.
 
-> **Status:** Core logic and command-line interface work end-to-end against
-> five live shops. The graphical interface (customtkinter) is not built yet —
-> see [Roadmap](#roadmap).
+> **Status:** Works end-to-end against five live shops, through both the
+> graphical interface and the command line. Packaging as a standalone `.exe`
+> is still open — see [Roadmap](#roadmap).
 
 ## Why this project
 
@@ -55,6 +55,24 @@ pip install -r requirements.txt
 
 ## Usage
 
+### Graphical interface
+
+```bash
+python -m bookscouter.ui
+```
+
+Enter an ISBN (hyphens and spaces are fine) and press Enter or click
+**Suchen**. Shops are queried one after another and each result appears as
+soon as that shop answers, so the window stays responsive throughout the
+roughly ten seconds a full lookup takes.
+
+Each row shows the current price next to the last price recorded for that
+shop, with the difference colour-coded — red if the book got more expensive,
+green if it got cheaper. A collapsible panel underneath lists earlier
+lookups for the same ISBN.
+
+### Command line
+
 ```bash
 python -m bookscouter.main 9783546100335
 ```
@@ -94,7 +112,16 @@ requests.
 
 Each scraper subclasses `Scraper` (`bookscouter/scrapers/base.py`) and
 implements `scrape(isbn) -> ScrapeResult`. The base class provides the shared
-HTTP helper, which enforces a minimum delay between requests.
+HTTP helper, which enforces a minimum delay between requests. All scrapers
+are registered once in `bookscouter/scrapers/__init__.py`, so the interface
+and the command line both pick up a new shop automatically.
+
+The interface runs the lookup on a background thread and hands results back
+to the Tk main loop through a `queue.Queue`, which the main loop drains on a
+timer. That keeps the window responsive while requests are in flight and
+lets each shop's row appear the moment it arrives. All database access
+happens on the worker thread using its own connection, since SQLite
+connections must not be shared across threads.
 
 That helper shells out to `curl` rather than using Python's `requests`
 library: several of these shops sit behind bot protection that blocks the TLS
@@ -123,7 +150,7 @@ considerably more stable across site redesigns.
 
 - [x] Core lookup logic, SQLite storage, price history
 - [x] Multiple shops behind a shared interface
-- [ ] customtkinter interface (search field, result table, price history)
+- [x] customtkinter interface (search field, result table, price history)
 - [ ] Packaging as a single `.exe` via PyInstaller
 - [ ] Optional: price-history chart, CSV export
 

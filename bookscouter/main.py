@@ -1,19 +1,15 @@
-"""Einstiegspunkt. UI-Start folgt in Phase 3, Phase 1 nutzt dies als CLI-Test."""
+"""Kommandozeilen-Variante der Suche.
+
+Die grafische Oberfläche liegt in `bookscouter/ui.py` und wird mit
+`python -m bookscouter.ui` gestartet; beide teilen sich Scraper-Liste,
+ISBN-Normalisierung und Datenbank.
+"""
 
 import sys
 
 from bookscouter.db import connect, get_price_history, save_lookup
-from bookscouter.scrapers.morawa import MorawaScraper
-from bookscouter.scrapers.thalia import BuecherDeScraper, ThaliaDeScraper, ThaliaScraper
-from bookscouter.scrapers.waltscomicshop import WaltsComicShopScraper
-
-SCRAPERS = [
-    ThaliaScraper,
-    ThaliaDeScraper,
-    BuecherDeScraper,
-    MorawaScraper,
-    WaltsComicShopScraper,
-]
+from bookscouter.isbn import normalize_isbn
+from bookscouter.scrapers import ALL_SCRAPERS
 
 
 def main() -> None:
@@ -23,12 +19,12 @@ def main() -> None:
         print("Verwendung: python -m bookscouter.main <ISBN>")
         sys.exit(1)
 
-    isbn = sys.argv[1]
+    isbn = normalize_isbn(sys.argv[1])
     conn = connect()
     history = get_price_history(conn, isbn)
     gefunden = False
 
-    for scraper_cls in SCRAPERS:
+    for scraper_cls in ALL_SCRAPERS:
         scraper = scraper_cls()
         result = scraper.scrape(isbn)
         if not result.gefunden:
