@@ -1,8 +1,9 @@
-"""Scraper für thalia.at/thalia.de: ISBN rein, Titel + Preis raus.
+"""Scraper für die Thalia-Plattform: ISBN rein, Titel + Preis raus.
 
-Beide Domains laufen auf derselben Plattform (identische Struktur, teils
-unterschiedliche Preise), daher ein parametrisierter Scraper statt zwei
-Kopien.
+Deckt thalia.at, thalia.de und buecher.de ab. Alle drei laufen auf derselben
+Plattform (identische Struktur bis hin zu denselben Artikel-IDs, Bilder von
+images.thalia.media – teils aber unterschiedliche Preise), daher ein
+parametrisierter Scraper statt drei Kopien.
 
 Thalia bietet keine ISBN-basierte Produkt-URL an. Der einzige Weg, eine ISBN
 einer Produktseite zuzuordnen, ist die Trefferliste unter /suche?sq=<isbn>.
@@ -79,3 +80,10 @@ class ThaliaScraper(Scraper):
 class ThaliaDeScraper(ThaliaScraper):
     def __init__(self) -> None:
         super().__init__(base_url="https://www.thalia.de", shop_name="Thalia.de")
+
+
+class BuecherDeScraper(ThaliaScraper):
+    """buecher.de – andere Marke, gleiche Plattform (siehe Modul-Docstring)."""
+
+    def __init__(self) -> None:
+        super().__init__(base_url="https://www.buecher.de", shop_name="Buecher.de")
