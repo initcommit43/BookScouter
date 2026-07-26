@@ -14,9 +14,11 @@ ausschließlich einzelne ISBNs auf gezielte Anfrage der Nutzerin/des Nutzers ab
 
 import html
 import json
+import re
 
 from bs4 import BeautifulSoup
 
+from bookscouter.isbn import normalize_isbn, to_isbn13
 from bookscouter.scrapers.base import Scraper, ScrapeResult
 
 
@@ -52,6 +54,15 @@ class ThaliaScraper(Scraper):
         if book_data is None:
             return not_found
 
+        # Absicherung gegen falsch zugeordnete Treffer: übernommen wird der
+        # erste artikeldetails-Link der Trefferliste, und Thalias Suche ist
+        # unscharf – ohne diese Prüfung könnte still der Preis eines anderen
+        # Buchs zurückkommen. Thalia schreibt die ISBN mit Bindestrichen und
+        # immer als ISBN-13, auch wenn mit einer ISBN-10 gesucht wurde, daher
+        # beide Seiten auf dieselbe Form bringen.
+        if normalize_isbn(str(book_data.get("isbn", ""))) != to_isbn13(isbn):
+            return not_found
+
         titel = book_data.get("name")
         preis_raw = book_data.get("offers", {}).get("price")
         if titel is None or preis_raw is None:
@@ -72,12 +83,40 @@ class ThaliaScraper(Scraper):
         soup = BeautifulSoup(html, "html.parser")
         for script in soup.find_all("script", type="application/ld+json"):
             try:
-                data = json.loads(script.string)
+                data = json.loads(_repariere_json_escapes(script.string))
             except (TypeError, ValueError):
                 continue
             if isinstance(data, dict) and data.get("@type") == "Book":
                 return data
         return None
+
+
+# In JSON sind nur diese Zeichen hinter einem Backslash erlaubt.
+_ERLAUBTE_ESCAPES = '"\\/bfnrtu'
+
+
+def _repariere_json_escapes(text: str) -> str:
+    """Entfernt ungültige Escape-Sequenzen aus Thalias JSON-LD.
+
+    Thalia escaped Anführungszeichen im Fliesstext erst zu \\" und lässt
+    danach noch das HTML-Escaping drüberlaufen. Übrig bleibt \\&quot; – und
+    \\& ist in JSON keine gültige Escape-Sequenz, weshalb json.loads den
+    kompletten Block abweist. Beobachtet z.B. bei 9783842006874 ("Gute
+    Nacht, Punpun 01"), wo die description \\&quot;Gott\\&quot; enthält.
+
+    Da der Fehler in einem Feld steckt, das dieser Scraper gar nicht liest,
+    darf er nicht die ganze Abfrage kosten: ein überflüssiger Backslash wird
+    verworfen, aus \\&quot; wird &quot; und daraus beim späteren
+    html.unescape() wieder ein normales Anführungszeichen.
+    """
+    return re.sub(
+        r"\\(.)",
+        lambda treffer: treffer.group(0)
+        if treffer.group(1) in _ERLAUBTE_ESCAPES
+        else treffer.group(1),
+        text,
+        flags=re.DOTALL,
+    )
 
 
 class ThaliaDeScraper(ThaliaScraper):

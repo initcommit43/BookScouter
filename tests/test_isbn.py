@@ -1,4 +1,4 @@
-from bookscouter.isbn import normalize_isbn
+from bookscouter.isbn import normalize_isbn, to_isbn13
 
 
 def test_removes_hyphens():
@@ -19,3 +19,24 @@ def test_keeps_isbn10_check_digit_x_uppercase():
 
 def test_empty_input():
     assert normalize_isbn("   ") == ""
+
+
+def test_isbn10_converted_to_isbn13():
+    # Live bei Thalia geprüft: 3831041652 und 9783831041657 sind dasselbe Buch.
+    assert to_isbn13("3831041652") == "9783831041657"
+
+
+def test_isbn10_with_hyphens_converted():
+    assert to_isbn13("3-8310-4165-2") == "9783831041657"
+
+
+def test_isbn13_passed_through_unchanged():
+    assert to_isbn13("9783831041657") == "9783831041657"
+
+
+def test_isbn10_with_x_check_digit_converted():
+    assert to_isbn13("080442957X") == "9780804429573"
+
+
+def test_nonsense_input_returned_normalized_without_raising():
+    assert to_isbn13("keine-isbn") == "KEINEISBN"

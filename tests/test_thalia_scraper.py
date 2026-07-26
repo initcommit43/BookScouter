@@ -35,8 +35,25 @@ DETAIL_HTML_WITH_ENTITIES = """
 <script type="application/ld+json">
 {
     "@type": "Book",
+    "isbn": "978-3-546-10033-5",
     "name": "Die Stra&szlig;e",
     "offers": {"price": "26.50"}
+}
+</script>
+</body></html>
+"""
+
+# Thalia liefert im Fliesstext \\&quot; – eine in JSON ungültige Escape-Sequenz,
+# an der json.loads den ganzen Block abwies (beobachtet bei 9783842006874).
+DETAIL_HTML_WITH_INVALID_ESCAPE = """
+<html><body>
+<script type="application/ld+json">
+{
+    "@type": "Book",
+    "isbn": "978-3-8420-0687-4",
+    "name": "Gute Nacht, Punpun 01",
+    "description": "Sein imaginierter Freund \\&quot;Gott\\&quot; hilft wenig.",
+    "offers": {"price": "8.30"}
 }
 </script>
 </body></html>
@@ -77,6 +94,39 @@ def test_scrape_decodes_html_entities_in_title(monkeypatch):
     result = ThaliaScraper().scrape("9783546100335")
 
     assert result.titel == "Die Straße"
+
+
+def test_scrape_survives_invalid_json_escape(monkeypatch):
+    responses = [FakeResponse(SEARCH_HTML_WITH_HIT), FakeResponse(DETAIL_HTML_WITH_INVALID_ESCAPE)]
+    monkeypatch.setattr(ThaliaScraper, "_get", lambda self, url, **kwargs: responses.pop(0))
+
+    result = ThaliaScraper().scrape("9783842006874")
+
+    assert result.gefunden is True
+    assert result.titel == "Gute Nacht, Punpun 01"
+    assert result.preis == 8.30
+
+
+def test_scrape_rejects_page_with_other_isbn(monkeypatch):
+    """Unscharfer Suchtreffer darf nicht als Preis des gesuchten Buchs durchgehen."""
+    responses = [FakeResponse(SEARCH_HTML_WITH_HIT), FakeResponse(DETAIL_HTML_WITH_PRICE)]
+    monkeypatch.setattr(ThaliaScraper, "_get", lambda self, url, **kwargs: responses.pop(0))
+
+    result = ThaliaScraper().scrape("9783842006874")
+
+    assert result.gefunden is False
+    assert result.preis is None
+
+
+def test_scrape_accepts_isbn10_for_isbn13_page(monkeypatch):
+    """Thalias Suche nimmt ISBN-10 an, die Seite führt aber die ISBN-13."""
+    responses = [FakeResponse(SEARCH_HTML_WITH_HIT), FakeResponse(DETAIL_HTML_WITH_PRICE)]
+    monkeypatch.setattr(ThaliaScraper, "_get", lambda self, url, **kwargs: responses.pop(0))
+
+    result = ThaliaScraper().scrape("3831041652")
+
+    assert result.gefunden is True
+    assert result.preis == 13.90
 
 
 def test_scrape_no_search_hit(monkeypatch):
