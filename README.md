@@ -6,7 +6,7 @@ history for a title can be tracked over time.
 
 > **Status:** Works end-to-end against five live shops, through both the
 > graphical interface and the command line. Packaging as a standalone `.exe`
-> is still open — see [Roadmap](#roadmap).
+> is still open.
 
 ## Why this project
 
@@ -17,26 +17,14 @@ a local record of what each title has cost.
 
 ## Supported shops
 
-| Shop | Platform | Lookup |
-|---|---|---|
-| thalia.at | Thalia | search → detail page, JSON-LD |
-| thalia.de | Thalia | search → detail page, JSON-LD |
-| buecher.de | Thalia | search → detail page, JSON-LD |
-| morawa.at | Morawa | direct ISBN URL, JSON-LD |
-| waltscomicshop.com | Shopify | search → product JSON endpoint |
+- thalia.at
+- thalia.de
+- buecher.de
+- morawa.at
+- waltscomicshop.com
 
 Every shop implements the same `Scraper` interface (ISBN in, title + price
 out), so adding another one means writing a single class.
-
-Two details worth noting, since they shaped the code:
-
-- **buecher.de runs on the Thalia platform** — same URL structure, same
-  article IDs, same markup. All three Thalia-platform shops are therefore
-  handled by one parametrised scraper rather than three near-copies. Their
-  prices do differ, so they remain separate entries.
-- **morawa.at exposes a direct, ISBN-addressable product URL**
-  (`/detail/ISBN-<isbn>`), so it needs a single request instead of a search
-  step followed by a detail request.
 
 ## Requirements
 
@@ -145,14 +133,6 @@ considerably more stable across site redesigns.
 - No scraped data is committed to this repository — code only.
 - Users are responsible for complying with the terms of service of whichever
   shops they configure.
-
-## Roadmap
-
-- [x] Core lookup logic, SQLite storage, price history
-- [x] Multiple shops behind a shared interface
-- [x] customtkinter interface (search field, result table, price history)
-- [ ] Packaging as a single `.exe` via PyInstaller
-- [ ] Optional: price-history chart, CSV export
 
 ## License
 
