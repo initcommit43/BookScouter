@@ -20,6 +20,7 @@ import json
 
 from bs4 import BeautifulSoup
 
+from bookscouter.isbn import normalize_isbn, to_isbn13
 from bookscouter.scrapers.base import Scraper, ScrapeResult
 
 
@@ -32,7 +33,12 @@ class MorawaScraper(Scraper):
             shop=self.shop_name, isbn=isbn, titel=None, preis=None, gefunden=False
         )
 
-        response = self._get(f"{self.base_url}/detail/ISBN-{isbn}")
+        # Morawa kennt nur ISBN-13: eine ISBN-10 in der URL liefert 404 statt
+        # einer Weiterleitung. Also vor dem Request umrechnen – sonst würde
+        # eine ISBN-10-Suche hier fälschlich "nicht geführt" melden.
+        isbn13 = to_isbn13(isbn)
+
+        response = self._get(f"{self.base_url}/detail/ISBN-{isbn13}")
         if not response.ok:
             return not_found
 
@@ -43,7 +49,7 @@ class MorawaScraper(Scraper):
         # Absicherung gegen "Soft 404" bzw. falsch zugeordnete Seiten: die
         # Seite muss wirklich die angefragte ISBN führen (im JSON-LD steht
         # sie als Zahl, daher str()).
-        if str(book_data.get("isbn")) != isbn:
+        if normalize_isbn(str(book_data.get("isbn"))) != isbn13:
             return not_found
 
         titel = book_data.get("name")

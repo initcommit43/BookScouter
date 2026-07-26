@@ -97,6 +97,24 @@ def test_scrape_uses_direct_isbn_url_without_search(monkeypatch):
     assert requested_urls == ["https://www.morawa.at/detail/ISBN-9783546100335"]
 
 
+def test_scrape_converts_isbn10_to_isbn13_for_url(monkeypatch):
+    """Morawa kennt nur ISBN-13, eine ISBN-10 in der URL liefert 404."""
+    requested_urls = []
+
+    def fake_get(self, url, **kwargs):
+        requested_urls.append(url)
+        return FakeResponse(DETAIL_HTML_WITH_PRICE)
+
+    monkeypatch.setattr(MorawaScraper, "_get", fake_get)
+
+    # 3546100336 ist die ISBN-10 zu 9783546100335.
+    result = MorawaScraper().scrape("3546100336")
+
+    assert requested_urls == ["https://www.morawa.at/detail/ISBN-9783546100335"]
+    assert result.gefunden is True
+    assert result.preis == 26.95
+
+
 def test_scrape_not_carried_returns_404(monkeypatch):
     monkeypatch.setattr(
         MorawaScraper, "_get", lambda self, url, **kwargs: FakeResponse("", ok=False)
