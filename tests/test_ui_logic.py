@@ -6,20 +6,12 @@ Bildschirm und wird von Hand geprüft.
 """
 
 from bookscouter.ui import BookScouterApp, FARBE_GEDAEMPFT, FARBE_GUENSTIGER, FARBE_TEURER
-from bookscouter.ui import format_datum, format_preis
+from bookscouter.ui import format_preis
 
 
 def test_format_preis_uses_german_decimal_comma():
     assert format_preis(26.5) == "26,50 €"
     assert format_preis(7.0) == "7,00 €"
-
-
-def test_format_datum_from_iso_timestamp():
-    assert format_datum("2026-07-25T19:32:07.862179+00:00") == "25.07.2026"
-
-
-def test_format_datum_passes_through_unparsable_value():
-    assert format_datum("keine-datumsangabe") == "keine-datumsangabe"
 
 
 def test_differenz_teurer():

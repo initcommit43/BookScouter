@@ -1,7 +1,7 @@
 """customtkinter-Oberfläche für BookScouter.
 
-Aufbau: Eingabefeld + Suchen-Button, darunter die Ergebnistabelle und ein
-aufklappbarer Bereich mit früheren Abfragen.
+Aufbau: Eingabefeld + Suchen-Button, darunter die Ergebnistabelle und der
+Preisverlauf früherer Abfragen als Diagramm (siehe `bookscouter/chart.py`).
 
 Wichtig für die Bedienbarkeit: Das Abfragen aller Shops dauert wegen des
 Rate-Limitings mehrere Sekunden. Deshalb läuft die Suche in einem
@@ -16,10 +16,11 @@ werden.
 
 import queue
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 
 import customtkinter as ctk
 
+from bookscouter.chart import PreisverlaufChart
 from bookscouter.db import connect, get_price_history, save_lookup
 from bookscouter.isbn import normalize_isbn
 from bookscouter.scrapers import ALL_SCRAPERS
@@ -29,22 +30,11 @@ FARBE_GUENSTIGER = ("#1a7f37", "#3fb950")
 FARBE_TEURER = ("#cf222e", "#f85149")
 FARBE_GEDAEMPFT = ("gray45", "gray60")
 
-SPALTEN = ("Shop", "Titel", "Preis", "Vorher", "")
-
-# So viele frühere Abfragen zeigt der aufgeklappte Bereich höchstens – mehr
-# würde der Ergebnistabelle darüber zu viel Platz nehmen.
-HISTORIE_MAX_ZEILEN = 6
+SPALTEN = ("Shop", "Titel", "Preis", "")
 
 
 def format_preis(wert: float) -> str:
     return f"{wert:.2f} €".replace(".", ",")
-
-
-def format_datum(iso_datum: str) -> str:
-    try:
-        return datetime.fromisoformat(iso_datum).strftime("%d.%m.%Y")
-    except ValueError:
-        return iso_datum
 
 
 class BookScouterApp(ctk.CTk):
@@ -59,8 +49,9 @@ class BookScouterApp(ctk.CTk):
         self._laeuft = False
         self._vorherige_preise: dict[str, dict] = {}
         self._treffer = 0
-        self._historie_offen = False
-        self._historie_anzahl = 0
+        # Historie aus der Datenbank plus die Ergebnisse der laufenden Suche,
+        # damit das Diagramm den heutigen Stand direkt mitzeigt.
+        self._verlaufsdaten: list[dict] = []
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
@@ -68,7 +59,7 @@ class BookScouterApp(ctk.CTk):
         self._baue_eingabe()
         self._baue_status()
         self._baue_ergebnisbereich()
-        self._baue_historie()
+        self._baue_verlauf()
 
         self.eingabe.focus()
 
@@ -112,17 +103,12 @@ class BookScouterApp(ctk.CTk):
         self.ergebnisse.grid_columnconfigure(1, weight=1)
         self._zeile = 0
 
-    def _baue_historie(self) -> None:
-        self.historie_button = ctk.CTkButton(
-            self, text="", anchor="w", height=32, fg_color="transparent",
-            text_color=FARBE_GEDAEMPFT, hover=False, command=self._schalte_historie,
+    def _baue_verlauf(self) -> None:
+        self.verlauf_titel = ctk.CTkLabel(
+            self, text="Preisverlauf", anchor="w",
+            font=ctk.CTkFont(size=12, weight="bold"), text_color=FARBE_GEDAEMPFT,
         )
-        # Bewusst ein normaler CTkFrame statt CTkScrollableFrame: der wächst
-        # exakt mit seinem Inhalt, statt eine feste Höhe zu belegen und bei
-        # wenigen Einträgen halb leer zu wirken. Damit er nicht beliebig hoch
-        # wird, zeigt _zeige_historie nur die letzten HISTORIE_MAX_ZEILEN.
-        self.historie_rahmen = ctk.CTkFrame(self)
-        self.historie_rahmen.grid_columnconfigure(2, weight=1)
+        self.verlauf = PreisverlaufChart(self)
 
     # ------------------------------------------------------------------- Suche
 
@@ -138,11 +124,12 @@ class BookScouterApp(ctk.CTk):
         self._laeuft = True
         self._treffer = 0
         self._vorherige_preise = {}
+        self._verlaufsdaten = []
         self.such_button.configure(state="disabled", text="Sucht …")
         self.fortschritt.configure(mode="indeterminate")
         self.fortschritt.start()
         self._leere_ergebnisse()
-        self._verstecke_historie()
+        self._verstecke_verlauf()
 
         self._queue = queue.Queue()
         threading.Thread(
@@ -198,7 +185,7 @@ class BookScouterApp(ctk.CTk):
 
         if art == "historie":
             self._merke_vorherige_preise(nachricht[1])
-            self._zeige_historie(nachricht[1])
+            self._verlaufsdaten = list(nachricht[1])
         elif art == "fortschritt":
             _, shop, nummer, gesamt = nachricht
             self._setze_status(f"Frage {shop} ab … ({nummer} von {gesamt})")
@@ -217,6 +204,7 @@ class BookScouterApp(ctk.CTk):
         self.fortschritt.configure(mode="determinate")
         self.fortschritt.set(0)
         self.such_button.configure(state="normal", text="Suchen")
+        self._zeige_verlauf()
 
         gesamt = len(ALL_SCRAPERS)
         if self._treffer == 0:
@@ -253,7 +241,7 @@ class BookScouterApp(ctk.CTk):
             ctk.CTkLabel(
                 self.ergebnisse, text="— nicht geführt —", anchor="w",
                 text_color=FARBE_GEDAEMPFT,
-            ).grid(row=self._zeile, column=1, columnspan=4, padx=(0, 14), pady=3, sticky="w")
+            ).grid(row=self._zeile, column=1, columnspan=3, padx=(0, 14), pady=3, sticky="w")
             self._zeile += 1
             return
 
@@ -263,14 +251,23 @@ class BookScouterApp(ctk.CTk):
         self._zelle(2, format_preis(ergebnis.preis),
                     font=ctk.CTkFont(size=13, weight="bold"))
 
+        # Der frühere Preis selbst steht im Diagramm; hier genügt die
+        # Veränderung gegenüber der letzten Abfrage.
         vorher = self._vorherige_preise.get(ergebnis.shop)
-        if vorher is None:
-            self._zelle(3, "(neu)", text_color=FARBE_GEDAEMPFT)
-        else:
-            self._zelle(3, format_preis(vorher["preis"]), text_color=FARBE_GEDAEMPFT)
+        if vorher is not None:
             text, farbe = self._differenz(ergebnis.preis, vorher["preis"])
-            self._zelle(4, text, text_color=farbe)
+            self._zelle(3, text, text_color=farbe)
 
+        # Das aktuelle Ergebnis gehört in den Verlauf, sonst würde das
+        # Diagramm die gerade gespeicherte Abfrage erst beim nächsten Start
+        # zeigen.
+        self._verlaufsdaten.append(
+            {
+                "shop": ergebnis.shop,
+                "preis": ergebnis.preis,
+                "datum": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         self._zeile += 1
 
     @staticmethod
@@ -288,70 +285,31 @@ class BookScouterApp(ctk.CTk):
         self._zelle(0, shop, text_color=FARBE_GEDAEMPFT)
         ctk.CTkLabel(
             self.ergebnisse, text=f"Fehler: {fehler}", anchor="w", text_color=FARBE_TEURER,
-        ).grid(row=self._zeile, column=1, columnspan=4, padx=(0, 14), pady=3, sticky="w")
+        ).grid(row=self._zeile, column=1, columnspan=3, padx=(0, 14), pady=3, sticky="w")
         self._zeile += 1
 
-    # --------------------------------------------------------------- Historie
+    # ------------------------------------------------------------ Preisverlauf
 
     def _merke_vorherige_preise(self, historie: list[dict]) -> None:
         """Letzter bekannter Preis je Shop – die Historie ist aufsteigend sortiert."""
         self._vorherige_preise = {eintrag["shop"]: eintrag for eintrag in historie}
 
-    def _zeige_historie(self, historie: list[dict]) -> None:
-        for kind in self.historie_rahmen.winfo_children():
-            kind.destroy()
-
-        if not historie:
-            self._verstecke_historie()
+    def _zeige_verlauf(self) -> None:
+        if not self._verlaufsdaten:
+            self._verstecke_verlauf()
             return
 
-        neueste_zuerst = list(reversed(historie))
-        for zeile, eintrag in enumerate(neueste_zuerst[:HISTORIE_MAX_ZEILEN]):
-            for spalte, text in enumerate(
-                (
-                    format_datum(eintrag["datum"]),
-                    eintrag["shop"],
-                    format_preis(eintrag["preis"]),
-                )
-            ):
-                ctk.CTkLabel(
-                    self.historie_rahmen, text=text, anchor="w",
-                    text_color=FARBE_GEDAEMPFT,
-                ).grid(row=zeile, column=spalte, padx=(14, 14), pady=2, sticky="w")
-
-        weitere = len(historie) - HISTORIE_MAX_ZEILEN
-        if weitere > 0:
-            ctk.CTkLabel(
-                self.historie_rahmen, text=f"… und {weitere} weitere", anchor="w",
-                text_color=FARBE_GEDAEMPFT,
-            ).grid(row=HISTORIE_MAX_ZEILEN, column=0, columnspan=3,
-                   padx=(14, 14), pady=(2, 6), sticky="w")
-
-        self._historie_anzahl = len(historie)
-        self._historie_offen = False
-        self._aktualisiere_historie_button()
-        self.historie_button.grid(row=3, column=0, padx=20, pady=(0, 16), sticky="ew")
-        self.historie_rahmen.grid_remove()
-
-    def _aktualisiere_historie_button(self) -> None:
-        pfeil = "▾" if self._historie_offen else "▸"
-        self.historie_button.configure(
-            text=f"{pfeil} Frühere Abfragen ({self._historie_anzahl})"
+        self.verlauf_titel.grid(row=3, column=0, padx=20, pady=(4, 4), sticky="ew")
+        self.verlauf.grid(row=4, column=0, padx=20, pady=(0, 16), sticky="ew")
+        # Feste Shop-Reihenfolge: die Farbe hängt am Shop, nicht daran, wer
+        # bei dieser Suche geantwortet hat.
+        self.verlauf.zeige(
+            self._verlaufsdaten, [scraper_cls().shop_name for scraper_cls in ALL_SCRAPERS]
         )
 
-    def _schalte_historie(self) -> None:
-        self._historie_offen = not self._historie_offen
-        self._aktualisiere_historie_button()
-        if self._historie_offen:
-            # sticky="ew": nur horizontal dehnen, die Höhe bleibt bei 130px.
-            self.historie_rahmen.grid(row=4, column=0, padx=20, pady=(0, 16), sticky="ew")
-        else:
-            self.historie_rahmen.grid_remove()
-
-    def _verstecke_historie(self) -> None:
-        self.historie_button.grid_remove()
-        self.historie_rahmen.grid_remove()
-        self._historie_offen = False
+    def _verstecke_verlauf(self) -> None:
+        self.verlauf_titel.grid_remove()
+        self.verlauf.grid_remove()
 
     # ----------------------------------------------------------------- Status
 
