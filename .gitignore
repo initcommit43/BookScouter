@@ -13,10 +13,12 @@ __pycache__/
 venv/
 env/
 
-# PyInstaller build output
+# PyInstaller build output — BookScouter.spec gehört ins Repo, die 14-MB-.exe
+# nicht; sie wird lokal gebaut (siehe README) bzw. als Release angehängt.
 build/
 dist/
 *.spec.bak
+BookScouter.exe
 
 # Local data / scraping results — nie gescrapte Daten committen
 *.db

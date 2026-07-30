@@ -7,6 +7,11 @@ from urllib.parse import urlencode
 
 from bookscouter.config import REQUEST_DELAY_SECONDS, USER_AGENT
 
+# Ohne dieses Flag blitzt unter Windows bei jedem curl-Aufruf kurz ein
+# Konsolenfenster auf – in der gepackten .exe, die selbst keine Konsole hat,
+# wären das pro Suche bis zu zehn Blitzer. Nur unter Windows vorhanden.
+_OHNE_KONSOLENFENSTER = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 # Rückfallwert, wenn ein Shop keine oder eine unbekannte Verfügbarkeit meldet.
 # Bewusst nicht "Nicht auf Lager": ein fehlendes Feld heisst nicht, dass der
 # Titel vergriffen ist, und eine falsche Aussage wäre schlechter als keine.
@@ -94,6 +99,7 @@ class Scraper:
             text=True,
             encoding="utf-8",
             errors="replace",
+            creationflags=_OHNE_KONSOLENFENSTER,
         )
         self._last_request_time = time.monotonic()
 

@@ -4,9 +4,8 @@ A local desktop tool for entering a book ISBN and seeing prices across
 several online shops at a glance. Every lookup is stored locally, so price
 history for a title can be tracked over time.
 
-> **Status:** Works end-to-end against five live shops, through both the
-> graphical interface and the command line. Packaging as a standalone `.exe`
-> is still open.
+> **Status:** Works end-to-end against five live shops, through the graphical
+> interface, the command line, and a standalone Windows `.exe`.
 
 ## Why this project
 
@@ -42,6 +41,18 @@ pip install -r requirements.txt
 ```
 
 ## Usage
+
+### Windows: BookScouter.exe
+
+Double-click `BookScouter.exe` in the project folder. No Python installation
+and no setup needed — it is a single self-contained file.
+
+The `.exe` is not checked into the repository (it is 14 MB of build output).
+Build it with:
+
+```bash
+pyinstaller BookScouter.spec --distpath . --workpath build --noconfirm
+```
 
 ### Graphical interface
 
