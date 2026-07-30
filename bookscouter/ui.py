@@ -17,6 +17,7 @@ werden.
 import queue
 import threading
 import webbrowser
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import customtkinter as ctk
@@ -46,6 +47,15 @@ def format_preis(wert: float) -> str:
     return f"{wert:.2f} €".replace(".", ",")
 
 
+@dataclass
+class Fehlerzeile:
+    """Ein Shop, der nicht antworten konnte – steht in derselben Liste wie
+    die Ergebnisse, damit die Tabelle in einem Rutsch sortiert werden kann."""
+
+    shop: str
+    text: str
+
+
 class BookScouterApp(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
@@ -58,6 +68,9 @@ class BookScouterApp(ctk.CTk):
         self._laeuft = False
         self._vorherige_preise: dict[str, dict] = {}
         self._treffer = 0
+        # Alle bisher eingetroffenen Zeilen dieser Suche (Ergebnisse und
+        # Fehler); die Tabelle wird daraus jedes Mal sortiert neu gezeichnet.
+        self._zeilen: list = []
         # Historie aus der Datenbank plus die Ergebnisse der laufenden Suche,
         # damit das Diagramm den heutigen Stand direkt mitzeigt.
         self._verlaufsdaten: list[dict] = []
@@ -136,6 +149,7 @@ class BookScouterApp(ctk.CTk):
         self._treffer = 0
         self._vorherige_preise = {}
         self._verlaufsdaten = []
+        self._zeilen = []
         self.such_button.configure(state="disabled", text="Sucht …")
         self.fortschritt.configure(mode="indeterminate")
         self.fortschritt.start()
@@ -261,6 +275,57 @@ class BookScouterApp(ctk.CTk):
         link.bind("<Button-1>", lambda _event, ziel=url: webbrowser.open(ziel))
 
     def _zeige_ergebnis(self, ergebnis) -> None:
+        """Nimmt ein eingetroffenes Shop-Ergebnis auf und zeichnet neu."""
+        if ergebnis.gefunden:
+            self._treffer += 1
+            # Das aktuelle Ergebnis gehört in den Verlauf, sonst würde das
+            # Diagramm die gerade gespeicherte Abfrage erst beim nächsten
+            # Start zeigen.
+            self._verlaufsdaten.append(
+                {
+                    "shop": ergebnis.shop,
+                    "preis": ergebnis.preis,
+                    "datum": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+
+        self._zeilen.append(ergebnis)
+        self._zeichne_tabelle()
+
+    def _zeichne_tabelle(self) -> None:
+        """Zeichnet alle bisher eingetroffenen Zeilen in sortierter Reihenfolge.
+
+        Nach jedem Shop komplett neu statt nur anzuhängen: die Sortierung
+        hängt an den Preisen, und der günstigste Shop kann erst als letzter
+        antworten. Bei fünf Zeilen ist das Neuzeichnen nicht spürbar, und
+        die Zeilen erscheinen weiterhin einzeln, sobald ein Shop geantwortet
+        hat.
+        """
+        self._leere_ergebnisse()
+        for zeile in sorted(self._zeilen, key=self._sortierschluessel):
+            if isinstance(zeile, Fehlerzeile):
+                self._zeichne_fehlerzeile(zeile)
+            else:
+                self._zeichne_ergebniszeile(zeile)
+
+    @staticmethod
+    def _sortierschluessel(zeile) -> tuple[int, float]:
+        """Günstigstes Angebot zuerst, nicht Lieferbares ans Ende.
+
+        Vier Gruppen, innerhalb jeder Gruppe nach Preis aufsteigend:
+        sofort lieferbar, unklar (u.a. "Unbekannt" und "Vorbestellbar"),
+        vergriffen, und zuletzt Shops ohne Angebot bzw. mit Fehler – die
+        haben keinen Preis, den man vergleichen könnte.
+        """
+        if isinstance(zeile, Fehlerzeile) or not zeile.gefunden:
+            return (3, 0.0)
+        if zeile.verfuegbarkeit in VERFUEGBAR:
+            return (0, zeile.preis)
+        if zeile.verfuegbarkeit in NICHT_VERFUEGBAR:
+            return (2, zeile.preis)
+        return (1, zeile.preis)
+
+    def _zeichne_ergebniszeile(self, ergebnis) -> None:
         if not ergebnis.gefunden:
             self._zelle(0, ergebnis.shop, text_color=FARBE_GEDAEMPFT)
             ctk.CTkLabel(
@@ -273,7 +338,6 @@ class BookScouterApp(ctk.CTk):
             self._zeile += 1
             return
 
-        self._treffer += 1
         self._zelle(0, ergebnis.shop)
         self._zelle(1, ergebnis.titel)
         self._zelle(2, format_preis(ergebnis.preis),
@@ -294,16 +358,6 @@ class BookScouterApp(ctk.CTk):
         if ergebnis.url:
             self._link_zelle(5, ergebnis.url)
 
-        # Das aktuelle Ergebnis gehört in den Verlauf, sonst würde das
-        # Diagramm die gerade gespeicherte Abfrage erst beim nächsten Start
-        # zeigen.
-        self._verlaufsdaten.append(
-            {
-                "shop": ergebnis.shop,
-                "preis": ergebnis.preis,
-                "datum": datetime.now(timezone.utc).isoformat(),
-            }
-        )
         self._zeile += 1
 
     @staticmethod
@@ -331,9 +385,14 @@ class BookScouterApp(ctk.CTk):
         return f"{pfeil} {betrag} €", farbe
 
     def _zeige_fehlerzeile(self, shop: str, fehler: str) -> None:
-        self._zelle(0, shop, text_color=FARBE_GEDAEMPFT)
+        self._zeilen.append(Fehlerzeile(shop=shop, text=fehler))
+        self._zeichne_tabelle()
+
+    def _zeichne_fehlerzeile(self, zeile: "Fehlerzeile") -> None:
+        self._zelle(0, zeile.shop, text_color=FARBE_GEDAEMPFT)
         ctk.CTkLabel(
-            self.ergebnisse, text=f"Fehler: {fehler}", anchor="w", text_color=FARBE_TEURER,
+            self.ergebnisse, text=f"Fehler: {zeile.text}", anchor="w",
+            text_color=FARBE_TEURER,
         ).grid(
             row=self._zeile, column=1, columnspan=SPALTEN_RESTBREITE,
             padx=(0, 14), pady=3, sticky="w",
