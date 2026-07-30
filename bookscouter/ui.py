@@ -15,10 +15,13 @@ werden.
 """
 
 import queue
+import sys
 import threading
+import tkinter
 import webbrowser
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 
 import customtkinter as ctk
 
@@ -47,6 +50,17 @@ def format_preis(wert: float) -> str:
     return f"{wert:.2f} €".replace(".", ",")
 
 
+def icon_pfad() -> Path:
+    """Pfad zu `BookScouter.ico` – aus dem Quellordner oder aus der .exe.
+
+    PyInstaller entpackt die gebündelten Dateien beim Start in ein temporäres
+    Verzeichnis und hinterlegt es in `sys._MEIPASS`; im Quellbetrieb liegt
+    das Icon dagegen einfach neben dem Paket.
+    """
+    basis = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent))
+    return basis / "assets" / "BookScouter.ico"
+
+
 @dataclass
 class Fehlerzeile:
     """Ein Shop, der nicht antworten konnte – steht in derselben Liste wie
@@ -63,6 +77,7 @@ class BookScouterApp(ctk.CTk):
         self.title("BookScouter")
         self.geometry("860x680")
         self.minsize(700, 520)
+        self._setze_fenstersymbol()
 
         self._queue: queue.Queue | None = None
         self._laeuft = False
@@ -86,6 +101,25 @@ class BookScouterApp(ctk.CTk):
         self.eingabe.focus()
 
     # ------------------------------------------------------------------ Aufbau
+
+    def _setze_fenstersymbol(self) -> None:
+        """Setzt das Icon für Titelleiste und Taskleiste.
+
+        Fehlt oder klemmt die Datei, läuft die App ohne eigenes Symbol
+        weiter – ein hübscheres Fenster ist keinen Absturz wert. Der
+        verzögerte zweite Versuch ist nötig, weil customtkinter beim Aufbau
+        sein eigenes Symbol setzt und das direkt gesetzte sonst überschreibt.
+        """
+        pfad = str(icon_pfad())
+
+        def setzen() -> None:
+            try:
+                self.iconbitmap(pfad)
+            except tkinter.TclError:
+                pass
+
+        setzen()
+        self.after(300, setzen)
 
     def _baue_eingabe(self) -> None:
         rahmen = ctk.CTkFrame(self, fg_color="transparent")

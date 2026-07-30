@@ -54,6 +54,10 @@ Build it with:
 pyinstaller BookScouter.spec --distpath . --workpath build --noconfirm
 ```
 
+The app icon is not a checked-in binary either: `assets/make_icon.py` draws it
+and writes `assets/BookScouter.ico`, using nothing but the standard library.
+Run it after changing the design.
+
 ### Graphical interface
 
 ```bash

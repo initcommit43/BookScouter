@@ -13,12 +13,14 @@ Anmerkungen:
 - `console=False`: die App ist ein Fenster, kein Terminal. Deshalb ruft
   `scrapers/base.py` curl mit CREATE_NO_WINDOW auf, sonst blitzte bei jeder
   Abfrage eine Konsole auf.
-- Kein Icon hinterlegt – die .exe trägt vorerst das PyInstaller-Standardbild.
+- Das Icon liegt als `assets/BookScouter.ico` bei und wird zusätzlich ins
+  Bündel kopiert, weil die App es zur Laufzeit auch als Fenstersymbol setzt.
+  Neu erzeugen lässt es sich mit `python assets/make_icon.py`.
 """
 
 from PyInstaller.utils.hooks import collect_all
 
-datas = []
+datas = [('assets/BookScouter.ico', 'assets')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('customtkinter')
@@ -59,4 +61,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=['assets/BookScouter.ico'],
 )
