@@ -22,7 +22,7 @@ import customtkinter as ctk
 
 from bookscouter.chart import PreisverlaufChart
 from bookscouter.db import connect, get_price_history, save_lookup
-from bookscouter.isbn import normalize_isbn
+from bookscouter.isbn import to_isbn13
 from bookscouter.scrapers import ALL_SCRAPERS
 
 # Farben jeweils als (Hell-Modus, Dunkel-Modus).
@@ -116,7 +116,9 @@ class BookScouterApp(ctk.CTk):
         if self._laeuft:
             return
 
-        isbn = normalize_isbn(self.eingabe.get())
+        # ISBN-13 ist der einheitliche Schlüssel: sonst bekäme dasselbe Buch je
+        # nach eingetippter Schreibweise zwei getrennte Preisverläufe.
+        isbn = to_isbn13(self.eingabe.get())
         if not isbn:
             self._setze_status("Bitte zuerst eine ISBN eingeben.")
             return

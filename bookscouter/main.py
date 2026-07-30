@@ -8,7 +8,7 @@ ISBN-Normalisierung und Datenbank.
 import sys
 
 from bookscouter.db import connect, get_price_history, save_lookup
-from bookscouter.isbn import normalize_isbn
+from bookscouter.isbn import to_isbn13
 from bookscouter.scrapers import ALL_SCRAPERS
 
 
@@ -19,7 +19,9 @@ def main() -> None:
         print("Verwendung: python -m bookscouter.main <ISBN>")
         sys.exit(1)
 
-    isbn = normalize_isbn(sys.argv[1])
+    # ISBN-13 ist der einheitliche Schlüssel: sonst bekäme dasselbe Buch je
+    # nach eingetippter Schreibweise zwei getrennte Preisverläufe.
+    isbn = to_isbn13(sys.argv[1])
     conn = connect()
     history = get_price_history(conn, isbn)
     gefunden = False

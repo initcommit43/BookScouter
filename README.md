@@ -85,7 +85,11 @@ Bisherige Preise:
 Shops that do not carry the title are reported individually; the command
 exits with a non-zero status only if no shop had the book at all.
 
-Results are written to a local SQLite file (`bookscouter.db`, gitignored).
+Results are written to a local SQLite file in your user profile
+(`%LOCALAPPDATA%\BookScouter\bookscouter.db` on Windows), so the price history
+is the same no matter which directory the app is started from. ISBN-10 input
+is converted to the equivalent ISBN-13 before storing, so looking a book up
+either way keeps a single history.
 
 ## Running the tests
 
