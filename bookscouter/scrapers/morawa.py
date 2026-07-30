@@ -21,7 +21,7 @@ import json
 from bs4 import BeautifulSoup
 
 from bookscouter.isbn import normalize_isbn, to_isbn13
-from bookscouter.scrapers.base import Scraper, ScrapeResult
+from bookscouter.scrapers.base import Scraper, ScrapeResult, verfuegbarkeit_aus_schema_org
 
 
 class MorawaScraper(Scraper):
@@ -38,7 +38,8 @@ class MorawaScraper(Scraper):
         # eine ISBN-10-Suche hier fälschlich "nicht geführt" melden.
         isbn13 = to_isbn13(isbn)
 
-        response = self._get(f"{self.base_url}/detail/ISBN-{isbn13}")
+        produkt_url = f"{self.base_url}/detail/ISBN-{isbn13}"
+        response = self._get(produkt_url)
         if not response.ok:
             return not_found
 
@@ -52,8 +53,9 @@ class MorawaScraper(Scraper):
         if normalize_isbn(str(book_data.get("isbn"))) != isbn13:
             return not_found
 
+        angebot = book_data.get("offers", {})
         titel = book_data.get("name")
-        preis = book_data.get("offers", {}).get("price")
+        preis = angebot.get("price")
         if titel is None or preis is None:
             return not_found
 
@@ -63,6 +65,10 @@ class MorawaScraper(Scraper):
             titel=titel,
             preis=float(preis),
             gefunden=True,
+            verfuegbarkeit=verfuegbarkeit_aus_schema_org(angebot.get("availability")),
+            # Die ISBN-URL ist stabil; das JSON-LD nennt zusätzlich eine
+            # Variante mit Autor/Titel-Slug, die auf dieselbe Seite führt.
+            url=produkt_url,
         )
 
     @staticmethod

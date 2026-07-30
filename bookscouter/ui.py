@@ -16,6 +16,7 @@ werden.
 
 import queue
 import threading
+import webbrowser
 from datetime import datetime, timezone
 
 import customtkinter as ctk
@@ -29,8 +30,16 @@ from bookscouter.scrapers import ALL_SCRAPERS
 FARBE_GUENSTIGER = ("#1a7f37", "#3fb950")
 FARBE_TEURER = ("#cf222e", "#f85149")
 FARBE_GEDAEMPFT = ("gray45", "gray60")
+FARBE_LINK = ("#0969da", "#4493f8")
 
-SPALTEN = ("Shop", "Titel", "Preis", "")
+SPALTEN = ("Shop", "Titel", "Preis", "", "Verfügbarkeit", "")
+# Spalte, über die sich Zeilen ohne Preis (nicht geführt, Fehler) erstrecken.
+SPALTEN_RESTBREITE = len(SPALTEN) - 1
+
+# Verfügbarkeiten, die als "kann man kaufen" bzw. "kann man nicht kaufen"
+# eingefärbt werden; alles andere (inkl. "Unbekannt") bleibt gedämpft.
+VERFUEGBAR = {"Auf Lager", "Nur im Laden", "Nur online", "Nur begrenzt"}
+NICHT_VERFUEGBAR = {"Nicht auf Lager", "Ausverkauft", "Nicht mehr lieferbar"}
 
 
 def format_preis(wert: float) -> str:
@@ -237,13 +246,30 @@ class BookScouterApp(ctk.CTk):
             row=self._zeile, column=spalte, padx=(0, 14), pady=3, sticky="w"
         )
 
+    def _link_zelle(self, spalte: int, url: str) -> None:
+        """Klickbarer Verweis auf die Produktseite des Shops.
+
+        customtkinter kennt kein Link-Widget; ein Label mit Unterstreichung,
+        Hand-Cursor und Klick-Binding ist die übliche Lösung dafür.
+        """
+        link = ctk.CTkLabel(
+            self.ergebnisse, text="Zum Angebot ↗", anchor="w",
+            text_color=FARBE_LINK, cursor="hand2",
+            font=ctk.CTkFont(size=12, underline=True),
+        )
+        link.grid(row=self._zeile, column=spalte, padx=(0, 14), pady=3, sticky="w")
+        link.bind("<Button-1>", lambda _event, ziel=url: webbrowser.open(ziel))
+
     def _zeige_ergebnis(self, ergebnis) -> None:
         if not ergebnis.gefunden:
             self._zelle(0, ergebnis.shop, text_color=FARBE_GEDAEMPFT)
             ctk.CTkLabel(
                 self.ergebnisse, text="— nicht geführt —", anchor="w",
                 text_color=FARBE_GEDAEMPFT,
-            ).grid(row=self._zeile, column=1, columnspan=3, padx=(0, 14), pady=3, sticky="w")
+            ).grid(
+                row=self._zeile, column=1, columnspan=SPALTEN_RESTBREITE,
+                padx=(0, 14), pady=3, sticky="w",
+            )
             self._zeile += 1
             return
 
@@ -260,6 +286,14 @@ class BookScouterApp(ctk.CTk):
             text, farbe = self._differenz(ergebnis.preis, vorher["preis"])
             self._zelle(3, text, text_color=farbe)
 
+        self._zelle(4, ergebnis.verfuegbarkeit,
+                    text_color=self._verfuegbarkeits_farbe(ergebnis.verfuegbarkeit))
+
+        # Ein Treffer ohne URL sollte nicht vorkommen, würde aber sonst ein
+        # ins Leere zeigendes "Zum Angebot" ergeben.
+        if ergebnis.url:
+            self._link_zelle(5, ergebnis.url)
+
         # Das aktuelle Ergebnis gehört in den Verlauf, sonst würde das
         # Diagramm die gerade gespeicherte Abfrage erst beim nächsten Start
         # zeigen.
@@ -271,6 +305,19 @@ class BookScouterApp(ctk.CTk):
             }
         )
         self._zeile += 1
+
+    @staticmethod
+    def _verfuegbarkeits_farbe(verfuegbarkeit: str) -> tuple[str, str]:
+        """Grün für lieferbar, rot für vergriffen – sonst gedämpft.
+
+        Grün/Rot sind dieselben Farben wie bei der Preisdifferenz: hier wie
+        dort heissen sie schlicht "gut" bzw. "schlecht" für die Kaufende.
+        """
+        if verfuegbarkeit in VERFUEGBAR:
+            return FARBE_GUENSTIGER
+        if verfuegbarkeit in NICHT_VERFUEGBAR:
+            return FARBE_TEURER
+        return FARBE_GEDAEMPFT
 
     @staticmethod
     def _differenz(jetzt: float, vorher: float) -> tuple[str, tuple[str, str]]:
@@ -287,7 +334,10 @@ class BookScouterApp(ctk.CTk):
         self._zelle(0, shop, text_color=FARBE_GEDAEMPFT)
         ctk.CTkLabel(
             self.ergebnisse, text=f"Fehler: {fehler}", anchor="w", text_color=FARBE_TEURER,
-        ).grid(row=self._zeile, column=1, columnspan=3, padx=(0, 14), pady=3, sticky="w")
+        ).grid(
+            row=self._zeile, column=1, columnspan=SPALTEN_RESTBREITE,
+            padx=(0, 14), pady=3, sticky="w",
+        )
         self._zeile += 1
 
     # ------------------------------------------------------------ Preisverlauf

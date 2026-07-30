@@ -7,6 +7,41 @@ from urllib.parse import urlencode
 
 from bookscouter.config import REQUEST_DELAY_SECONDS, USER_AGENT
 
+# Rückfallwert, wenn ein Shop keine oder eine unbekannte Verfügbarkeit meldet.
+# Bewusst nicht "Nicht auf Lager": ein fehlendes Feld heisst nicht, dass der
+# Titel vergriffen ist, und eine falsche Aussage wäre schlechter als keine.
+VERFUEGBARKEIT_UNBEKANNT = "Unbekannt"
+
+# schema.org/ItemAvailability – Thalia-Plattform und Morawa liefern diese
+# Werte als URL im JSON-LD ("https://schema.org/InStock").
+_SCHEMA_ORG_VERFUEGBARKEIT = {
+    "instock": "Auf Lager",
+    "instoreonly": "Nur im Laden",
+    "onlineonly": "Nur online",
+    "limitedavailability": "Nur begrenzt",
+    "preorder": "Vorbestellbar",
+    "presale": "Vorbestellbar",
+    "backorder": "Nachbestellt",
+    "outofstock": "Nicht auf Lager",
+    "soldout": "Ausverkauft",
+    "discontinued": "Nicht mehr lieferbar",
+}
+
+
+def verfuegbarkeit_aus_schema_org(wert: object) -> str:
+    """Übersetzt einen schema.org-Verfügbarkeitswert in einen Anzeigetext.
+
+    Nimmt sowohl die URL-Schreibweise ("https://schema.org/InStock") als auch
+    den blossen Namen ("InStock"). Alles, was fehlt, kein String ist oder
+    nicht im Katalog steht, wird zu `VERFUEGBARKEIT_UNBEKANNT` – die Funktion
+    wirft nie, damit ein unerwarteter Wert nie eine sonst gelungene Abfrage
+    kostet.
+    """
+    if not isinstance(wert, str):
+        return VERFUEGBARKEIT_UNBEKANNT
+    name = wert.strip().rstrip("/").rsplit("/", 1)[-1].lower()
+    return _SCHEMA_ORG_VERFUEGBARKEIT.get(name, VERFUEGBARKEIT_UNBEKANNT)
+
 
 @dataclass
 class ScrapeResult:
@@ -15,6 +50,11 @@ class ScrapeResult:
     titel: str | None
     preis: float | None
     gefunden: bool
+    # Anzeigetext der Lagerverfügbarkeit; bei nicht gefundenen Titeln
+    # uninteressant, deshalb mit Rückfallwert vorbelegt.
+    verfuegbarkeit: str = VERFUEGBARKEIT_UNBEKANNT
+    # Produktseite beim Shop, in der Oberfläche als Link hinterlegt.
+    url: str | None = None
 
 
 @dataclass

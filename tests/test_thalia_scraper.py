@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from bookscouter.scrapers.base import VERFUEGBARKEIT_UNBEKANNT
 from bookscouter.scrapers.thalia import BuecherDeScraper, ThaliaDeScraper, ThaliaScraper
 
 SEARCH_HTML_WITH_HIT = """
@@ -23,7 +24,8 @@ DETAIL_HTML_WITH_PRICE = """
     "offers": {
         "@type": "Offer",
         "priceCurrency": "EUR",
-        "price": "13.90"
+        "price": "13.90",
+        "availability": "https://schema.org/InStock"
     }
 }
 </script>
@@ -59,6 +61,19 @@ DETAIL_HTML_WITH_INVALID_ESCAPE = """
 </body></html>
 """
 
+DETAIL_HTML_PREORDER = """
+<html><body>
+<script type="application/ld+json">
+{
+    "@type": "Book",
+    "isbn": "978-3-8310-4165-7",
+    "name": "Self-Care Collection. Ayurveda",
+    "offers": {"price": "13.90", "availability": "https://schema.org/PreOrder"}
+}
+</script>
+</body></html>
+"""
+
 DETAIL_HTML_WITHOUT_PRICE = """
 <html><body>
 <script type="application/ld+json">
@@ -85,6 +100,28 @@ def test_scrape_found(monkeypatch):
     assert result.preis == 13.90
     assert result.shop == "Thalia.at"
     assert result.isbn == "9783831041657"
+    assert result.verfuegbarkeit == "Auf Lager"
+    assert result.url == "https://www.thalia.at/shop/home/artikeldetails/A1059470515"
+
+
+def test_scrape_reads_preorder_availability(monkeypatch):
+    responses = [FakeResponse(SEARCH_HTML_WITH_HIT), FakeResponse(DETAIL_HTML_PREORDER)]
+    monkeypatch.setattr(ThaliaScraper, "_get", lambda self, url, **kwargs: responses.pop(0))
+
+    result = ThaliaScraper().scrape("9783831041657")
+
+    assert result.verfuegbarkeit == "Vorbestellbar"
+
+
+def test_scrape_without_availability_falls_back(monkeypatch):
+    """Ohne Verfügbarkeitsangabe bleibt der Preis trotzdem gültig."""
+    responses = [FakeResponse(SEARCH_HTML_WITH_HIT), FakeResponse(DETAIL_HTML_WITH_ENTITIES)]
+    monkeypatch.setattr(ThaliaScraper, "_get", lambda self, url, **kwargs: responses.pop(0))
+
+    result = ThaliaScraper().scrape("9783546100335")
+
+    assert result.gefunden is True
+    assert result.verfuegbarkeit == VERFUEGBARKEIT_UNBEKANNT
 
 
 def test_scrape_decodes_html_entities_in_title(monkeypatch):
@@ -176,6 +213,8 @@ def test_de_scraper_uses_de_domain(monkeypatch):
     assert result.gefunden is True
     assert requested_urls[0].startswith("https://www.thalia.de/suche")
     assert requested_urls[1].startswith("https://www.thalia.de/shop/home/artikeldetails")
+    # Der Link zeigt auf dieselbe Domain wie die Abfrage, nicht auf thalia.at.
+    assert result.url == "https://www.thalia.de/shop/home/artikeldetails/A1059470515"
 
 
 def test_buecherde_scraper_uses_buecherde_domain(monkeypatch):

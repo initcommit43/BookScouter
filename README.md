@@ -54,10 +54,14 @@ Enter an ISBN (hyphens and spaces are fine) and press Enter or click
 soon as that shop answers, so the window stays responsive throughout the
 roughly ten seconds a full lookup takes.
 
-Each row shows the current price next to the last price recorded for that
-shop, with the difference colour-coded — red if the book got more expensive,
-green if it got cheaper. A collapsible panel underneath lists earlier
-lookups for the same ISBN.
+Each row shows the shop's price, how it changed since the last lookup (red if
+the book got more expensive, green if it got cheaper), whether the shop has
+it in stock, and a link straight to that shop's product page. Underneath, a
+chart plots the price history per shop; hovering it snaps to a day and lists
+what every shop charged that day.
+
+Shops that report no stock information are shown as "Unbekannt" rather than
+being guessed at.
 
 ### Command line
 
@@ -66,11 +70,13 @@ python -m bookscouter.main 9783546100335
 ```
 
 ```
-Die Straße - Thalia.at: 26.50 EUR
-Die Straße - Thalia.de: 25.00 EUR
-Die Straße - Buecher.de: 25.00 EUR
-Die Straße - Morawa.at: 26.95 EUR
-Nicht gefunden bei Walt's Comic Shop.
+Watchmen (2019 Edition) - Thalia.at: 24.99 EUR – Nur begrenzt
+  https://www.thalia.at/shop/home/artikeldetails/A1055357218
+Watchmen (2019 Edition) - Thalia.de: 22.99 EUR – Nur begrenzt
+  https://www.thalia.de/shop/home/artikeldetails/A1055357218
+Nicht gefunden bei Morawa.at.
+Watchmen TP New Edition - Walt's Comic Shop: 22.49 EUR – Nicht auf Lager
+  https://www.waltscomicshop.com/products/watchmen-tp-new-edition
 ```
 
 Look the same ISBN up again later and previous prices are listed alongside
@@ -122,9 +128,12 @@ headers. `curl` gets through while still sending the project's own honest
 User-Agent, which keeps the tool identifiable rather than pretending to be a
 browser.
 
-Prices and titles are read from each page's structured data (JSON-LD, or
-Shopify's product JSON) instead of scraped out of layout markup, which is
-considerably more stable across site redesigns.
+Prices, titles and stock status are read from each page's structured data
+(JSON-LD, or Shopify's product JSON) instead of scraped out of layout markup,
+which is considerably more stable across site redesigns. Stock comes from the
+`availability` field of the JSON-LD offer, mapped from schema.org's vocabulary
+onto a handful of German labels; a shop that omits it reports "Unbekannt", so
+a missing field is never mistaken for "out of stock".
 
 ## Usage & legal notes
 

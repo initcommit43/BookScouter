@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from bookscouter.scrapers.base import VERFUEGBARKEIT_UNBEKANNT
 from bookscouter.scrapers.morawa import MorawaScraper
 
 DETAIL_HTML_WITH_PRICE = """
@@ -15,7 +16,8 @@ DETAIL_HTML_WITH_PRICE = """
     "offers": {
       "@type": "Offer",
       "priceCurrency": "EUR",
-      "price": 26.95
+      "price": 26.95,
+      "availability": "https://schema.org/InStock"
     }
   }
 }
@@ -54,6 +56,22 @@ DETAIL_HTML_WITHOUT_PRICE = """
 </body></html>
 """
 
+DETAIL_HTML_WITHOUT_AVAILABILITY = """
+<html><body>
+<script type="application/ld+json">
+{
+  "@type": "WebPage",
+  "mainEntity": {
+    "@type": ["book", "product"],
+    "isbn": 9783546100335,
+    "name": "Die Stra\\u00dfe",
+    "offers": {"price": 26.95}
+  }
+}
+</script>
+</body></html>
+"""
+
 DETAIL_HTML_NO_BOOK_ENTITY = """
 <html><body>
 <script type="application/ld+json">
@@ -81,6 +99,31 @@ def test_scrape_found(monkeypatch):
     assert result.preis == 26.95
     assert result.shop == "Morawa.at"
     assert result.isbn == "9783546100335"
+    assert result.verfuegbarkeit == "Auf Lager"
+    assert result.url == "https://www.morawa.at/detail/ISBN-9783546100335"
+
+
+def test_scrape_without_availability_falls_back(monkeypatch):
+    monkeypatch.setattr(
+        MorawaScraper,
+        "_get",
+        lambda self, url, **kwargs: FakeResponse(DETAIL_HTML_WITHOUT_AVAILABILITY),
+    )
+
+    result = MorawaScraper().scrape("9783546100335")
+
+    assert result.gefunden is True
+    assert result.verfuegbarkeit == VERFUEGBARKEIT_UNBEKANNT
+
+
+def test_scrape_url_uses_isbn13_for_isbn10_input(monkeypatch):
+    monkeypatch.setattr(
+        MorawaScraper, "_get", lambda self, url, **kwargs: FakeResponse(DETAIL_HTML_WITH_PRICE)
+    )
+
+    result = MorawaScraper().scrape("3546100336")
+
+    assert result.url == "https://www.morawa.at/detail/ISBN-9783546100335"
 
 
 def test_scrape_uses_direct_isbn_url_without_search(monkeypatch):

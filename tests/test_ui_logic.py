@@ -5,6 +5,7 @@ für die Darstellung aufbereiten. Der Aufbau der Widgets selbst braucht einen
 Bildschirm und wird von Hand geprüft.
 """
 
+from bookscouter.scrapers.base import VERFUEGBARKEIT_UNBEKANNT
 from bookscouter.ui import BookScouterApp, FARBE_GEDAEMPFT, FARBE_GUENSTIGER, FARBE_TEURER
 from bookscouter.ui import format_preis
 
@@ -30,6 +31,22 @@ def test_differenz_unveraendert():
     text, farbe = BookScouterApp._differenz(25.00, 25.00)
     assert text == "– unverändert"
     assert farbe == FARBE_GEDAEMPFT
+
+
+def test_verfuegbarkeits_farbe_lieferbar():
+    assert BookScouterApp._verfuegbarkeits_farbe("Auf Lager") == FARBE_GUENSTIGER
+    assert BookScouterApp._verfuegbarkeits_farbe("Nur im Laden") == FARBE_GUENSTIGER
+
+
+def test_verfuegbarkeits_farbe_vergriffen():
+    assert BookScouterApp._verfuegbarkeits_farbe("Nicht auf Lager") == FARBE_TEURER
+    assert BookScouterApp._verfuegbarkeits_farbe("Ausverkauft") == FARBE_TEURER
+
+
+def test_verfuegbarkeits_farbe_unbekannt_bleibt_neutral():
+    """"Unbekannt" ist keine Aussage – also weder grün noch rot."""
+    assert BookScouterApp._verfuegbarkeits_farbe(VERFUEGBARKEIT_UNBEKANNT) == FARBE_GEDAEMPFT
+    assert BookScouterApp._verfuegbarkeits_farbe("Vorbestellbar") == FARBE_GEDAEMPFT
 
 
 def test_vorherige_preise_keeps_latest_entry_per_shop():

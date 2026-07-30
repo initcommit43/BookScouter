@@ -34,7 +34,9 @@ def main() -> None:
             continue
 
         gefunden = True
-        print(f"{result.titel} - {result.shop}: {result.preis:.2f} EUR")
+        print(f"{result.titel} - {result.shop}: {result.preis:.2f} EUR – {result.verfuegbarkeit}")
+        if result.url:
+            print(f"  {result.url}")
         save_lookup(conn, isbn=isbn, titel=result.titel, shop=result.shop, preis=result.preis)
 
     if history:

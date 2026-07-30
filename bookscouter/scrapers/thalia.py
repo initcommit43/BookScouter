@@ -19,7 +19,7 @@ import re
 from bs4 import BeautifulSoup
 
 from bookscouter.isbn import normalize_isbn, to_isbn13
-from bookscouter.scrapers.base import Scraper, ScrapeResult
+from bookscouter.scrapers.base import Scraper, ScrapeResult, verfuegbarkeit_aus_schema_org
 
 
 class ThaliaScraper(Scraper):
@@ -63,8 +63,9 @@ class ThaliaScraper(Scraper):
         if normalize_isbn(str(book_data.get("isbn", ""))) != to_isbn13(isbn):
             return not_found
 
+        angebot = book_data.get("offers", {})
         titel = book_data.get("name")
-        preis_raw = book_data.get("offers", {}).get("price")
+        preis_raw = angebot.get("price")
         if titel is None or preis_raw is None:
             return not_found
 
@@ -76,6 +77,10 @@ class ThaliaScraper(Scraper):
             titel=html.unescape(titel),
             preis=float(preis_raw),
             gefunden=True,
+            verfuegbarkeit=verfuegbarkeit_aus_schema_org(angebot.get("availability")),
+            # Die gerade abgerufene Detailseite ist zugleich die Produktseite
+            # für den Link – identisch mit dem `url`-Feld des JSON-LD.
+            url=detail_url,
         )
 
     @staticmethod
