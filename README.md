@@ -69,6 +69,13 @@ Enter an ISBN (hyphens and spaces are fine) and press Enter or click
 soon as that shop answers, so the window stays responsive throughout the
 roughly ten seconds a full lookup takes.
 
+A checkbox per shop sits under the input field. All of them start ticked;
+unticking one leaves it out of the next lookup, which is the quickest way to
+cut the waiting time when only one or two shops interest you. The selection
+applies to the current session and is not saved between starts. The price
+history chart keeps showing every shop it has data for, so a shop's line
+keeps its colour whether or not it was queried this time.
+
 Each row shows the shop's price, how it changed since the last lookup (red if
 the book got more expensive, green if it got cheaper), whether the shop has
 it in stock, and a link straight to that shop's product page. Underneath, a

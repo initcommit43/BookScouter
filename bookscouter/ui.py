@@ -45,9 +45,35 @@ SPALTEN_RESTBREITE = len(SPALTEN) - 1
 VERFUEGBAR = {"Auf Lager", "Nur im Laden", "Nur online", "Nur begrenzt"}
 NICHT_VERFUEGBAR = {"Nicht auf Lager", "Ausverkauft", "Nicht mehr lieferbar"}
 
+# Zeilen des Hauptfensters als Namen statt als Zahlen: sonst verschiebt jede
+# neu eingefügte Zeile die Nummern in mehreren Methoden gleichzeitig.
+(
+    ZEILE_EINGABE,
+    ZEILE_SHOPS,
+    ZEILE_STATUS,
+    ZEILE_ERGEBNISSE,
+    ZEILE_VERLAUF_TITEL,
+    ZEILE_VERLAUF,
+) = range(6)
+
 
 def format_preis(wert: float) -> str:
     return f"{wert:.2f} €".replace(".", ",")
+
+
+def shop_namen() -> list[str]:
+    """Anzeigenamen aller Shops in der Reihenfolge von ALL_SCRAPERS."""
+    return [scraper_cls().shop_name for scraper_cls in ALL_SCRAPERS]
+
+
+def gewaehlte_scraper(auswahl: dict[str, bool]) -> list:
+    """Die angehakten Scraper-Klassen, in der Reihenfolge von ALL_SCRAPERS.
+
+    Ein Shop, der in der Auswahl gar nicht auftaucht, gilt als angehakt: eine
+    lückenhafte Auswahl soll höchstens einen Shop zu viel abfragen, aber nie
+    stillschweigend einen verschlucken.
+    """
+    return [cls for cls in ALL_SCRAPERS if auswahl.get(cls().shop_name, True)]
 
 
 def icon_pfad() -> Path:
@@ -89,11 +115,15 @@ class BookScouterApp(ctk.CTk):
         # Historie aus der Datenbank plus die Ergebnisse der laufenden Suche,
         # damit das Diagramm den heutigen Stand direkt mitzeigt.
         self._verlaufsdaten: list[dict] = []
+        # Wie viele Shops die laufende Suche abfragt – nicht zwingend alle,
+        # seit die Shops einzeln abwählbar sind.
+        self._abgefragte_shops = len(ALL_SCRAPERS)
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(ZEILE_ERGEBNISSE, weight=1)
 
         self._baue_eingabe()
+        self._baue_shop_auswahl()
         self._baue_status()
         self._baue_ergebnisbereich()
         self._baue_verlauf()
@@ -123,7 +153,7 @@ class BookScouterApp(ctk.CTk):
 
     def _baue_eingabe(self) -> None:
         rahmen = ctk.CTkFrame(self, fg_color="transparent")
-        rahmen.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
+        rahmen.grid(row=ZEILE_EINGABE, column=0, padx=20, pady=(20, 10), sticky="ew")
         rahmen.grid_columnconfigure(0, weight=1)
 
         self.eingabe = ctk.CTkEntry(
@@ -137,9 +167,40 @@ class BookScouterApp(ctk.CTk):
         )
         self.such_button.grid(row=0, column=1, padx=(10, 0))
 
+    def _baue_shop_auswahl(self) -> None:
+        """Je Shop ein Kästchen; beim Start sind alle angehakt.
+
+        Die Auswahl gilt nur für die laufende Sitzung und wird bewusst nicht
+        gespeichert: dafür bräuchte es eine Einstellungsdatei, und der
+        Normalfall bleibt "alle Shops fragen".
+        """
+        rahmen = ctk.CTkFrame(self, fg_color="transparent")
+        rahmen.grid(row=ZEILE_SHOPS, column=0, padx=20, pady=(0, 10), sticky="ew")
+
+        self._shop_auswahl: dict[str, ctk.BooleanVar] = {}
+        self._shop_kaestchen: list[ctk.CTkCheckBox] = []
+        for spalte, name in enumerate(shop_namen()):
+            variable = ctk.BooleanVar(value=True)
+            kaestchen = ctk.CTkCheckBox(
+                rahmen, text=name, variable=variable, font=ctk.CTkFont(size=12),
+                checkbox_width=18, checkbox_height=18,
+            )
+            kaestchen.grid(row=0, column=spalte, padx=(0, 14), sticky="w")
+            self._shop_auswahl[name] = variable
+            self._shop_kaestchen.append(kaestchen)
+
+    def _aktuelle_auswahl(self) -> dict[str, bool]:
+        return {name: variable.get() for name, variable in self._shop_auswahl.items()}
+
+    def _sperre_shop_auswahl(self, gesperrt: bool) -> None:
+        """Während einer laufenden Suche nicht umstellbar – sonst passt die
+        Fortschrittsanzeige ("3 von 5") nicht mehr zu dem, was abgefragt wird."""
+        for kaestchen in self._shop_kaestchen:
+            kaestchen.configure(state="disabled" if gesperrt else "normal")
+
     def _baue_status(self) -> None:
         rahmen = ctk.CTkFrame(self, fg_color="transparent")
-        rahmen.grid(row=1, column=0, padx=20, pady=(0, 10), sticky="ew")
+        rahmen.grid(row=ZEILE_STATUS, column=0, padx=20, pady=(0, 10), sticky="ew")
         rahmen.grid_columnconfigure(0, weight=1)
 
         self.status_label = ctk.CTkLabel(
@@ -154,7 +215,7 @@ class BookScouterApp(ctk.CTk):
 
     def _baue_ergebnisbereich(self) -> None:
         self.ergebnisse = ctk.CTkScrollableFrame(self, label_text="Aktuelle Preise")
-        self.ergebnisse.grid(row=2, column=0, padx=20, pady=(0, 10), sticky="nsew")
+        self.ergebnisse.grid(row=ZEILE_ERGEBNISSE, column=0, padx=20, pady=(0, 10), sticky="nsew")
         # Titelspalte darf den übrigen Platz bekommen.
         self.ergebnisse.grid_columnconfigure(1, weight=1)
         self._zeile = 0
@@ -179,12 +240,19 @@ class BookScouterApp(ctk.CTk):
             self._setze_status("Bitte zuerst eine ISBN eingeben.")
             return
 
+        scraper_klassen = gewaehlte_scraper(self._aktuelle_auswahl())
+        if not scraper_klassen:
+            self._setze_status("Mindestens einen Shop auswählen.")
+            return
+
         self._laeuft = True
+        self._abgefragte_shops = len(scraper_klassen)
         self._treffer = 0
         self._vorherige_preise = {}
         self._verlaufsdaten = []
         self._zeilen = []
         self.such_button.configure(state="disabled", text="Sucht …")
+        self._sperre_shop_auswahl(True)
         self.fortschritt.configure(mode="indeterminate")
         self.fortschritt.start()
         self._leere_ergebnisse()
@@ -192,12 +260,12 @@ class BookScouterApp(ctk.CTk):
 
         self._queue = queue.Queue()
         threading.Thread(
-            target=self._arbeite, args=(isbn, self._queue), daemon=True
+            target=self._arbeite, args=(isbn, scraper_klassen, self._queue), daemon=True
         ).start()
         self.after(100, self._pruefe_queue)
 
     @staticmethod
-    def _arbeite(isbn: str, ausgabe: queue.Queue) -> None:
+    def _arbeite(isbn: str, scraper_klassen: list, ausgabe: queue.Queue) -> None:
         """Läuft im Hintergrund-Thread: DB lesen, scrapen, DB schreiben."""
         try:
             conn = connect()
@@ -205,8 +273,8 @@ class BookScouterApp(ctk.CTk):
                 historie = [dict(zeile) for zeile in get_price_history(conn, isbn)]
                 ausgabe.put(("historie", historie))
 
-                gesamt = len(ALL_SCRAPERS)
-                for nummer, scraper_cls in enumerate(ALL_SCRAPERS, start=1):
+                gesamt = len(scraper_klassen)
+                for nummer, scraper_cls in enumerate(scraper_klassen, start=1):
                     scraper = scraper_cls()
                     ausgabe.put(("fortschritt", scraper.shop_name, nummer, gesamt))
                     try:
@@ -263,11 +331,13 @@ class BookScouterApp(ctk.CTk):
         self.fortschritt.configure(mode="determinate")
         self.fortschritt.set(0)
         self.such_button.configure(state="normal", text="Suchen")
+        self._sperre_shop_auswahl(False)
         self._zeige_verlauf()
 
-        gesamt = len(ALL_SCRAPERS)
+        gesamt = self._abgefragte_shops
         if self._treffer == 0:
-            self._setze_status("Kein Shop führt diese ISBN.")
+            # "Kein Shop" wäre gelogen, wenn gar nicht alle gefragt wurden.
+            self._setze_status("Keiner der gewählten Shops führt diese ISBN.")
         else:
             self._setze_status(
                 f"Fertig – {self._treffer} von {gesamt} Shops führen den Titel."
@@ -444,13 +514,12 @@ class BookScouterApp(ctk.CTk):
             self._verstecke_verlauf()
             return
 
-        self.verlauf_titel.grid(row=3, column=0, padx=20, pady=(4, 4), sticky="ew")
-        self.verlauf.grid(row=4, column=0, padx=20, pady=(0, 16), sticky="ew")
-        # Feste Shop-Reihenfolge: die Farbe hängt am Shop, nicht daran, wer
-        # bei dieser Suche geantwortet hat.
-        self.verlauf.zeige(
-            self._verlaufsdaten, [scraper_cls().shop_name for scraper_cls in ALL_SCRAPERS]
-        )
+        self.verlauf_titel.grid(row=ZEILE_VERLAUF_TITEL, column=0, padx=20, pady=(4, 4), sticky="ew")
+        self.verlauf.grid(row=ZEILE_VERLAUF, column=0, padx=20, pady=(0, 16), sticky="ew")
+        # Immer alle Shops übergeben, nicht nur die angehakten: die Farbe hängt
+        # am Shop, nicht daran, wer bei dieser Suche gefragt wurde – sonst
+        # wechselt eine Linie die Farbe, sobald man einen Shop abwählt.
+        self.verlauf.zeige(self._verlaufsdaten, shop_namen())
 
     def _verstecke_verlauf(self) -> None:
         self.verlauf_titel.grid_remove()

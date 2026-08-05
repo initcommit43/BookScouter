@@ -5,9 +5,10 @@ für die Darstellung aufbereiten. Der Aufbau der Widgets selbst braucht einen
 Bildschirm und wird von Hand geprüft.
 """
 
+from bookscouter.scrapers import ALL_SCRAPERS
 from bookscouter.scrapers.base import VERFUEGBARKEIT_UNBEKANNT, ScrapeResult
 from bookscouter.ui import BookScouterApp, FARBE_GEDAEMPFT, FARBE_GUENSTIGER, FARBE_TEURER
-from bookscouter.ui import Fehlerzeile, format_preis
+from bookscouter.ui import Fehlerzeile, format_preis, gewaehlte_scraper, shop_namen
 
 
 def test_format_preis_uses_german_decimal_comma():
@@ -103,6 +104,50 @@ def test_sortierung_bei_gleichem_preis_bleibt_abfragereihenfolge():
     zeilen = [_ergebnis("Thalia.de", 25.00), _ergebnis("Buecher.de", 25.00)]
 
     assert _sortiere(zeilen) == ["Thalia.de", "Buecher.de"]
+
+
+def test_shop_namen_matches_scraper_list():
+    namen = shop_namen()
+
+    assert len(namen) == len(ALL_SCRAPERS)
+    assert namen[0] == "Thalia.at"
+    assert "Morawa.at" in namen
+
+
+def test_gewaehlte_scraper_alle_angehakt():
+    auswahl = {name: True for name in shop_namen()}
+
+    assert gewaehlte_scraper(auswahl) == ALL_SCRAPERS
+
+
+def test_gewaehlte_scraper_filtert_abgewaehlte_heraus():
+    auswahl = {name: name == "Morawa.at" for name in shop_namen()}
+
+    gewaehlt = gewaehlte_scraper(auswahl)
+
+    assert [cls().shop_name for cls in gewaehlt] == ["Morawa.at"]
+
+
+def test_gewaehlte_scraper_behaelt_reihenfolge_von_all_scrapers():
+    """Die Reihenfolge bestimmt die Diagrammfarben – sie darf nicht an der
+    Reihenfolge im Auswahl-Dict hängen."""
+    auswahl = {"Morawa.at": True, "Thalia.at": True}
+
+    gewaehlt = [cls().shop_name for cls in gewaehlte_scraper(auswahl)]
+
+    assert gewaehlt.index("Thalia.at") < gewaehlt.index("Morawa.at")
+
+
+def test_gewaehlte_scraper_ohne_auswahl_ist_leer():
+    auswahl = {name: False for name in shop_namen()}
+
+    assert gewaehlte_scraper(auswahl) == []
+
+
+def test_gewaehlte_scraper_unbekannter_shop_gilt_als_angehakt():
+    """Ein Shop, der in der Auswahl fehlt, darf nicht stillschweigend
+    wegfallen – lieber einer zu viel als einer zu wenig."""
+    assert gewaehlte_scraper({}) == ALL_SCRAPERS
 
 
 def test_vorherige_preise_keeps_latest_entry_per_shop():
