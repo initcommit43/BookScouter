@@ -17,18 +17,20 @@ from datetime import date, datetime
 
 import customtkinter as ctk
 
-# Kategoriale Palette, Slots 1–5, jeweils (hell, dunkel).
+# Kategoriale Palette, Slots 1–6, jeweils (hell, dunkel).
 #
 # Die Reihenfolge ist die Absicherung gegen Farbfehlsichtigkeit, nicht
 # Kosmetik – geprüft mit dem Validator der dataviz-Vorgaben (schlechtestes
-# benachbartes Paar ΔE 9.1 hell / 8.4 dunkel bei Zielwert 8). Wer hier
-# umsortiert oder Farben austauscht, muss neu prüfen.
+# benachbartes Paar ΔE 9.1 hell / 8.4 dunkel bei Zielwert 8, alle 6 Slots).
+# Wer hier umsortiert oder Farben austauscht, muss neu prüfen. Slot 6 (grün)
+# ist der nächste feste Slot der Referenzpalette, kein neu erfundener Wert.
 SERIENFARBEN = [
     ("#2a78d6", "#3987e5"),  # blau
     ("#eb6834", "#d95926"),  # orange
     ("#1baf7a", "#199e70"),  # aqua
     ("#eda100", "#c98500"),  # gelb
     ("#e87ba4", "#d55181"),  # magenta
+    ("#008300", "#008300"),  # grün
 ]
 
 FLAECHE = ("#fcfcfb", "#1a1a19")

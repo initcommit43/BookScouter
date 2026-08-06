@@ -21,6 +21,10 @@ a local record of what each title has cost.
 - buecher.de
 - morawa.at
 - waltscomicshop.com
+- amazon.de — verified against the live site, but Amazon's terms explicitly
+  prohibit automated access (unlike the other five, which only have a
+  robots.txt courtesy exception, see `bookscouter/scrapers/amazon.py`); weigh
+  that before enabling it
 
 Every shop implements the same `Scraper` interface (ISBN in, title + price
 out), so adding another one means writing a single class.

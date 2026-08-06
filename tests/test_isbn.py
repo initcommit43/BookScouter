@@ -1,4 +1,4 @@
-from bookscouter.isbn import normalize_isbn, to_isbn13
+from bookscouter.isbn import normalize_isbn, to_isbn10, to_isbn13
 
 
 def test_removes_hyphens():
@@ -40,3 +40,27 @@ def test_isbn10_with_x_check_digit_converted():
 
 def test_nonsense_input_returned_normalized_without_raising():
     assert to_isbn13("keine-isbn") == "KEINEISBN"
+
+
+def test_isbn13_converted_to_isbn10():
+    assert to_isbn10("9783831041657") == "3831041652"
+
+
+def test_isbn13_with_x_check_digit_converted_to_isbn10():
+    assert to_isbn10("9780804429573") == "080442957X"
+
+
+def test_isbn10_passed_through_unchanged():
+    assert to_isbn10("3831041652") == "3831041652"
+
+
+def test_isbn10_with_hyphens_normalized_and_passed_through():
+    assert to_isbn10("3-8310-4165-2") == "3831041652"
+
+
+def test_isbn13_with_979_prefix_has_no_isbn10_equivalent():
+    assert to_isbn10("9791234567896") is None
+
+
+def test_nonsense_input_returns_none():
+    assert to_isbn10("keine-isbn") is None

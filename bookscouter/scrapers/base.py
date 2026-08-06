@@ -84,6 +84,13 @@ class Scraper:
         (z. B. Thalia) blocken den TLS-Fingerabdruck von Python-HTTP-Clients
         per Cloudflare, unabhängig vom User-Agent-Header. curl mit demselben
         ehrlichen User-Agent kommt durch, ohne einen Browser vorzutäuschen.
+
+        `--compressed` ist Pflicht: amazon.de liefert manche Antworten
+        unangefragt gzip-komprimiert. Ohne das Flag landen die rohen
+        gzip-Bytes in `text=True`/`encoding="utf-8"` und werden lautlos zu
+        Ersatzzeichen – live beobachtet, dabei sah eine echte "auf Lager"-
+        Antwort wie "nicht gefunden" aus. Für Shops ohne Kompression ändert
+        das Flag nichts.
         """
         if params:
             url = f"{url}?{urlencode(params)}"
@@ -94,7 +101,10 @@ class Scraper:
                 time.sleep(wait)
 
         result = subprocess.run(
-            ["curl", "-s", "-L", "--max-time", "10", "-A", USER_AGENT, "-w", "\n%{http_code}", url],
+            [
+                "curl", "-s", "-L", "--compressed", "--max-time", "10",
+                "-A", USER_AGENT, "-w", "\n%{http_code}", url,
+            ],
             capture_output=True,
             text=True,
             encoding="utf-8",
