@@ -8,7 +8,10 @@ Bildschirm und wird von Hand geprüft.
 from bookscouter.scrapers import ALL_SCRAPERS
 from bookscouter.scrapers.base import VERFUEGBARKEIT_UNBEKANNT, ScrapeResult
 from bookscouter.ui import BookScouterApp, FARBE_GEDAEMPFT, FARBE_GUENSTIGER, FARBE_TEURER
-from bookscouter.ui import Fehlerzeile, format_preis, gewaehlte_scraper, shop_namen
+from bookscouter.ui import (
+    Buch, Fehlerzeile, bestes_angebot, format_preis, fortschritt_text,
+    gewaehlte_scraper, shop_namen,
+)
 
 
 def test_format_preis_uses_german_decimal_comma():
@@ -158,8 +161,74 @@ def test_vorherige_preise_keeps_latest_entry_per_shop():
         {"shop": "Morawa.at", "preis": 26.95, "datum": "2026-06-24T10:00:00+00:00"},
     ]
 
-    app = BookScouterApp.__new__(BookScouterApp)  # ohne Tk-Fenster
-    app._merke_vorherige_preise(historie)
+    letzte = BookScouterApp._letzte_preise(historie)
 
-    assert app._vorherige_preise["Thalia.at"]["preis"] == 24.99
-    assert app._vorherige_preise["Morawa.at"]["preis"] == 26.95
+    assert letzte["Thalia.at"]["preis"] == 24.99
+    assert letzte["Morawa.at"]["preis"] == 26.95
+
+
+# ------------------------------------------------------- Sammelabfrage: Bücher
+
+
+def test_bestes_angebot_ist_das_guenstigste_lieferbare():
+    zeilen = [_ergebnis("Teuer", 26.95), _ergebnis("Billig", 22.99)]
+
+    assert bestes_angebot(zeilen).shop == "Billig"
+
+
+def test_bestes_angebot_uebergeht_billigeres_vergriffenes():
+    """Dieselbe Regel wie in der Tabelle: kaufen kann man nur, was da ist."""
+    zeilen = [
+        _ergebnis("Vergriffen", 9.99, "Nicht auf Lager"),
+        _ergebnis("Lieferbar", 26.95, "Auf Lager"),
+    ]
+
+    assert bestes_angebot(zeilen).shop == "Lieferbar"
+
+
+def test_bestes_angebot_nimmt_vergriffenes_wenn_es_nichts_anderes_gibt():
+    zeilen = [_ergebnis("Vergriffen", 9.99, "Nicht auf Lager")]
+
+    assert bestes_angebot(zeilen).shop == "Vergriffen"
+
+
+def test_bestes_angebot_ohne_treffer_ist_none():
+    zeilen = [
+        Fehlerzeile(shop="Kaputt", text="Zeitüberschreitung"),
+        _ergebnis("Nicht geführt", None, gefunden=False),
+    ]
+
+    assert bestes_angebot(zeilen) is None
+
+
+def test_bestes_angebot_bei_leerer_liste_ist_none():
+    """Solange noch kein Shop geantwortet hat, gibt es nichts anzuzeigen."""
+    assert bestes_angebot([]) is None
+
+
+def test_buch_gefunden_wenn_mindestens_ein_shop_liefert():
+    buch = Buch(isbn="9783546100335")
+    buch.zeilen = [_ergebnis("Leer", None, gefunden=False), _ergebnis("Treffer", 12.00)]
+
+    assert buch.gefunden
+
+
+def test_buch_ohne_treffer_gilt_als_nicht_gefunden():
+    buch = Buch(isbn="9783546100335")
+    buch.zeilen = [
+        _ergebnis("Leer", None, gefunden=False),
+        Fehlerzeile(shop="Kaputt", text="Zeitüberschreitung"),
+    ]
+
+    assert not buch.gefunden
+
+
+def test_fortschritt_text_bei_einer_isbn_ohne_buchzaehlung():
+    """"Buch 1 von 1" wäre nur Lärm."""
+    assert fortschritt_text("Thalia.at", 1, 1, 2, 6) == "Frage Thalia.at ab … (2 von 6)"
+
+
+def test_fortschritt_text_bei_mehreren_isbns_zaehlt_buecher_mit():
+    text = fortschritt_text("Morawa.at", 3, 8, 4, 6)
+
+    assert text == "Buch 3 von 8 · Frage Morawa.at ab … (4 von 6)"
