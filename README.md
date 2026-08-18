@@ -4,7 +4,7 @@ A local desktop tool for entering a book ISBN and seeing prices across
 several online shops at a glance. Every lookup is stored locally, so price
 history for a title can be tracked over time.
 
-> **Status:** Works end-to-end against five live shops, through the graphical
+> **Status:** Works end-to-end against ten live shops, through the graphical
 > interface, the command line, and a standalone Windows `.exe`.
 
 ## Why this project
@@ -19,15 +19,39 @@ a local record of what each title has cost.
 - thalia.at
 - thalia.de
 - buecher.de
+- osiander.de
+- orellfuessli.ch — quotes Swiss francs; see [Currencies](#currencies)
 - morawa.at
 - waltscomicshop.com
+- danibooks.de — comic and manga publisher selling direct
+- altraverse.de — manga publisher selling direct; only carries
+  German-language ISBNs (`978-3-…`), so other ISBNs are skipped without a
+  request
 - amazon.de — verified against the live site, but Amazon's terms explicitly
-  prohibit automated access (unlike the other five, which only have a
+  prohibit automated access (unlike the others, which only have a
   robots.txt courtesy exception, see `bookscouter/scrapers/amazon.py`); weigh
   that before enabling it
 
 Every shop implements the same `Scraper` interface (ISBN in, title + price
-out), so adding another one means writing a single class.
+out), so adding another one means writing a single class. Five of them —
+thalia.at, thalia.de, buecher.de, osiander.de and orellfuessli.ch — run on
+the same shop platform and share one scraper, so each is only a subclass
+naming its own domain.
+
+## Currencies
+
+Every price is stored and compared in euros, so one column and one chart axis
+mean the same thing everywhere. Orell Füssli is the only shop outside the
+euro area; its franc prices are converted using the European Central Bank's
+daily reference rates, fetched at most once a day and cached in your user
+profile so the app still works offline.
+
+Converted rows always show the shop's own price too — `31.79 EUR (umgerechnet
+aus 29.90 CHF)` — because the franc amount is the actual shelf price. Bear in
+mind that stored history keeps the euro value from the day of the lookup, so
+an old Orell Füssli entry reflects that day's exchange rate as well as that
+day's price. If no rate can be fetched and none was ever cached, that shop
+reports no result rather than passing a franc amount off as euros.
 
 ## Requirements
 
@@ -71,7 +95,7 @@ python -m bookscouter.ui
 Enter an ISBN (hyphens and spaces are fine) and press Enter or click
 **Suchen**. Shops are queried one after another and each result appears as
 soon as that shop answers, so the window stays responsive throughout the
-roughly ten seconds a full lookup takes.
+roughly twenty seconds a full lookup across all ten shops takes.
 
 A checkbox per shop sits under the input field. All of them start ticked;
 unticking one leaves it out of the next lookup, which is the quickest way to
@@ -96,13 +120,18 @@ python -m bookscouter.main 9783546100335
 ```
 
 ```
-Watchmen (2019 Edition) - Thalia.at: 24.99 EUR – Nur begrenzt
-  https://www.thalia.at/shop/home/artikeldetails/A1055357218
-Watchmen (2019 Edition) - Thalia.de: 22.99 EUR – Nur begrenzt
-  https://www.thalia.de/shop/home/artikeldetails/A1055357218
-Nicht gefunden bei Morawa.at.
-Watchmen TP New Edition - Walt's Comic Shop: 22.49 EUR – Nicht auf Lager
-  https://www.waltscomicshop.com/products/watchmen-tp-new-edition
+Die Straße - Thalia.at: 26.50 EUR – Auf Lager
+  https://www.thalia.at/shop/home/artikeldetails/A1077153279
+Die Straße - Thalia.de: 25.00 EUR – Auf Lager
+  https://www.thalia.de/shop/home/artikeldetails/A1077153279
+Die Straße - Morawa.at: 26.95 EUR – Auf Lager
+  https://www.morawa.at/detail/ISBN-9783546100335
+Nicht gefunden bei Walt's Comic Shop.
+Die Straße - Osiander.de: 25.00 EUR – Auf Lager
+  https://www.osiander.de/shop/home/artikeldetails/A1077153279
+Die Straße - Orell Füssli: 39.23 EUR (umgerechnet aus 36.90 CHF) – Auf Lager
+  https://www.orellfuessli.ch/shop/home/artikeldetails/A1077153279
+Nicht gefunden bei altraverse.
 ```
 
 Look the same ISBN up again later and previous prices are listed alongside
@@ -135,10 +164,10 @@ requests.
 ## How it works
 
 Each scraper subclasses `Scraper` (`bookscouter/scrapers/base.py`) and
-implements `scrape(isbn) -> ScrapeResult`. The base class provides the shared
-HTTP helper, which enforces a minimum delay between requests. All scrapers
-are registered once in `bookscouter/scrapers/__init__.py`, so the interface
-and the command line both pick up a new shop automatically.
+implements `scrape(isbn) -> ScrapeResult`. The base class wraps the shared
+HTTP helper (`bookscouter/http.py`) with a minimum delay between requests.
+All scrapers are registered once in `bookscouter/scrapers/__init__.py`, so
+the interface and the command line both pick up a new shop automatically.
 
 The interface runs the lookup on a background thread and hands results back
 to the Tk main loop through a `queue.Queue`, which the main loop drains on a
@@ -155,11 +184,12 @@ User-Agent, which keeps the tool identifiable rather than pretending to be a
 browser.
 
 Prices, titles and stock status are read from each page's structured data
-(JSON-LD, or Shopify's product JSON) instead of scraped out of layout markup,
-which is considerably more stable across site redesigns. Stock comes from the
-`availability` field of the JSON-LD offer, mapped from schema.org's vocabulary
-onto a handful of German labels; a shop that omits it reports "Unbekannt", so
-a missing field is never mistaken for "out of stock".
+(JSON-LD, Microdata, or Shopify's product JSON) instead of scraped out of
+layout markup, which is considerably more stable across site redesigns.
+Stock comes from the `availability` field of the offer, mapped from
+schema.org's vocabulary onto a handful of German labels; a shop that omits
+it reports "Unbekannt", so a missing field is never mistaken for "out of
+stock".
 
 ## Usage & legal notes
 
