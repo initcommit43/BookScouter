@@ -253,6 +253,10 @@ class BookScouterApp(ctk.CTk):
         self._button_gedrueckt()
         return "break"
 
+    # Kästchen je Zeile. Alle Shops nebeneinander würden das Fenster über die
+    # Bildschirmbreite hinaus aufziehen, sobald es mehr als eine Handvoll sind.
+    SHOPS_JE_ZEILE = 5
+
     def _baue_shop_auswahl(self) -> None:
         """Je Shop ein Kästchen; beim Start sind alle angehakt.
 
@@ -265,13 +269,17 @@ class BookScouterApp(ctk.CTk):
 
         self._shop_auswahl: dict[str, ctk.BooleanVar] = {}
         self._shop_kaestchen: list[ctk.CTkCheckBox] = []
-        for spalte, name in enumerate(shop_namen()):
+        for nummer, name in enumerate(shop_namen()):
             variable = ctk.BooleanVar(value=True)
             kaestchen = ctk.CTkCheckBox(
                 rahmen, text=name, variable=variable, font=ctk.CTkFont(size=12),
                 checkbox_width=18, checkbox_height=18,
             )
-            kaestchen.grid(row=0, column=spalte, padx=(0, 14), sticky="w")
+            kaestchen.grid(
+                row=nummer // self.SHOPS_JE_ZEILE,
+                column=nummer % self.SHOPS_JE_ZEILE,
+                padx=(0, 14), pady=1, sticky="w",
+            )
             self._shop_auswahl[name] = variable
             self._shop_kaestchen.append(kaestchen)
 

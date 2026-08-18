@@ -17,13 +17,18 @@ from datetime import date, datetime
 
 import customtkinter as ctk
 
-# Kategoriale Palette, Slots 1–6, jeweils (hell, dunkel).
+# Kategoriale Palette, Slots 1–8, jeweils (hell, dunkel).
 #
 # Die Reihenfolge ist die Absicherung gegen Farbfehlsichtigkeit, nicht
 # Kosmetik – geprüft mit dem Validator der dataviz-Vorgaben (schlechtestes
-# benachbartes Paar ΔE 9.1 hell / 8.4 dunkel bei Zielwert 8, alle 6 Slots).
-# Wer hier umsortiert oder Farben austauscht, muss neu prüfen. Slot 6 (grün)
-# ist der nächste feste Slot der Referenzpalette, kein neu erfundener Wert.
+# benachbartes Paar ΔE 9.1 hell / 8.4 dunkel bei Zielwert 8, alle 8 Slots;
+# hell zusätzlich mit Kontrastwarnung für aqua/gelb/magenta, siehe unten).
+# Wer hier umsortiert oder Farben austauscht, muss neu prüfen. Alle acht sind
+# die festen Slots der Referenzpalette, keine neu erfundenen Werte.
+#
+# Die Kontrastwarnung im hellen Modus ist gedeckt: die Legende nennt zu jeder
+# Linie den Shop-Namen und den letzten Preis im Klartext, die Farbe ist also
+# nie der einzige Träger der Information.
 SERIENFARBEN = [
     ("#2a78d6", "#3987e5"),  # blau
     ("#eb6834", "#d95926"),  # orange
@@ -31,7 +36,25 @@ SERIENFARBEN = [
     ("#eda100", "#c98500"),  # gelb
     ("#e87ba4", "#d55181"),  # magenta
     ("#008300", "#008300"),  # grün
+    ("#4a3aa7", "#9085e9"),  # violett
+    ("#e34948", "#e66767"),  # rot
 ]
+
+# Mehr Shops als Farbslots: die Referenzpalette hat acht Slots und darf nicht
+# um selbst erfundene Farbtöne verlängert werden. Ab Slot 9 wiederholen sich
+# deshalb die Farben, und die Wiederholung wird über die Strichart
+# unterschieden – dieselbe Farbe einmal durchgezogen, einmal gestrichelt.
+# So bleibt jede Serie eindeutig, ohne die geprüften Farbabstände aufzugeben.
+STRICH_DURCHGEZOGEN: tuple[int, ...] = ()
+STRICH_GESTRICHELT = (6, 4)
+
+
+def serienstil(nummer: int) -> tuple[tuple[str, str], tuple[int, ...]]:
+    """Farbpaar und Strichart der n-ten Serie."""
+    return (
+        SERIENFARBEN[nummer % len(SERIENFARBEN)],
+        STRICH_DURCHGEZOGEN if nummer < len(SERIENFARBEN) else STRICH_GESTRICHELT,
+    )
 
 FLAECHE = ("#fcfcfb", "#1a1a19")
 GITTER = ("#e1e0d9", "#2c2c2a")
@@ -120,6 +143,7 @@ class PreisverlaufChart(ctk.CTkFrame):
 
         self._serien: dict[str, list[tuple[date, float]]] = {}
         self._farben: dict[str, tuple[str, str]] = {}
+        self._striche: dict[str, tuple[int, ...]] = {}
         # Beim Zeichnen gefüllt, Grundlage für das Hovern: x-Position je Tag
         # und die Werte, die an diesem Tag auf dem Diagramm liegen.
         self._spalten: list[tuple[float, date]] = []
@@ -148,10 +172,10 @@ class PreisverlaufChart(ctk.CTkFrame):
         verschieben.
         """
         self._serien = aggregiere_nach_tag(punkte)
-        self._farben = {
-            shop: SERIENFARBEN[nummer % len(SERIENFARBEN)]
-            for nummer, shop in enumerate(shop_reihenfolge)
-        }
+        self._farben = {}
+        self._striche = {}
+        for nummer, shop in enumerate(shop_reihenfolge):
+            self._farben[shop], self._striche[shop] = serienstil(nummer)
         self._baue_legende()
         self._zeichne()
 
@@ -168,8 +192,13 @@ class PreisverlaufChart(ctk.CTkFrame):
             spalte = (nummer % 3) * 3
             zeile = nummer // 3
 
+            # Das Legendensymbol zeigt auch die Strichart: bei mehr Shops als
+            # Farbslots teilen sich zwei Linien einen Farbton, und dann muss
+            # die Legende denselben Unterschied zeigen wie das Diagramm.
             ctk.CTkLabel(
-                self.legende, text="──", text_color=farbe(self._farben.get(shop, SERIENFARBEN[0])),
+                self.legende,
+                text="╌╌" if self._striche.get(shop) else "──",
+                text_color=farbe(self._farben.get(shop, SERIENFARBEN[0])),
                 font=ctk.CTkFont(size=13, weight="bold"),
             ).grid(row=zeile, column=spalte, padx=(0, 5), pady=1, sticky="w")
             ctk.CTkLabel(
@@ -273,6 +302,7 @@ class PreisverlaufChart(ctk.CTkFrame):
                 self.canvas.create_line(
                     [wert for punkt in koordinaten for wert in punkt],
                     fill=linienfarbe, width=2, smooth=False,
+                    dash=self._striche.get(shop, STRICH_DURCHGEZOGEN),
                 )
 
             for (x, y), (tag, preis) in zip(koordinaten, reihe):

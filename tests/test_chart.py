@@ -7,7 +7,7 @@ selbst braucht einen Bildschirm und wird von Hand geprüft.
 
 from datetime import date
 
-from bookscouter.chart import SERIENFARBEN, aggregiere_nach_tag, berechne_y_achse
+from bookscouter.chart import SERIENFARBEN, aggregiere_nach_tag, berechne_y_achse, serienstil
 
 
 def test_aggregiert_je_shop_und_tag():
@@ -86,7 +86,32 @@ def test_y_achse_bei_kleinen_preisunterschieden():
     assert schritt <= 0.5
 
 
-def test_genug_farbslots_fuer_alle_shops():
+def test_jeder_shop_bekommt_einen_eigenen_stil():
+    """Zwei Shops duerfen nie gleich aussehen.
+
+    Es gibt mehr Shops als Farbslots, deshalb reicht die Farbe allein nicht:
+    ab Slot 9 unterscheidet zusaetzlich die Strichart. Geprueft wird die
+    Kombination aus beidem.
+    """
     from bookscouter.scrapers import ALL_SCRAPERS
 
-    assert len(SERIENFARBEN) >= len(ALL_SCRAPERS)
+    stile = [serienstil(nummer) for nummer in range(len(ALL_SCRAPERS))]
+
+    assert len(set(stile)) == len(ALL_SCRAPERS)
+
+
+def test_erste_slots_sind_durchgezogen():
+    """Solange die Farbslots reichen, bleibt jede Linie durchgezogen."""
+    for nummer in range(len(SERIENFARBEN)):
+        farbpaar, strich = serienstil(nummer)
+
+        assert farbpaar == SERIENFARBEN[nummer]
+        assert strich == ()
+
+
+def test_ueberzaehlige_slots_werden_gestrichelt():
+    """Slot 9 wiederholt die Farbe von Slot 1 – dann aber gestrichelt."""
+    farbpaar, strich = serienstil(len(SERIENFARBEN))
+
+    assert farbpaar == SERIENFARBEN[0]
+    assert strich != ()
