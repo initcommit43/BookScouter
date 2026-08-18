@@ -1,16 +1,10 @@
 """Gemeinsames Interface für alle Shop-Scraper: ISBN rein, Titel+Preis raus."""
 
-import subprocess
 import time
 from dataclasses import dataclass
-from urllib.parse import urlencode
 
-from bookscouter.config import REQUEST_DELAY_SECONDS, USER_AGENT
-
-# Ohne dieses Flag blitzt unter Windows bei jedem curl-Aufruf kurz ein
-# Konsolenfenster auf – in der gepackten .exe, die selbst keine Konsole hat,
-# wären das pro Suche bis zu zehn Blitzer. Nur unter Windows vorhanden.
-_OHNE_KONSOLENFENSTER = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+from bookscouter.config import REQUEST_DELAY_SECONDS
+from bookscouter.http import HttpResponse, hole
 
 # Rückfallwert, wenn ein Shop keine oder eine unbekannte Verfügbarkeit meldet.
 # Bewusst nicht "Nicht auf Lager": ein fehlendes Feld heisst nicht, dass der
@@ -62,13 +56,6 @@ class ScrapeResult:
     url: str | None = None
 
 
-@dataclass
-class HttpResponse:
-    text: str
-    ok: bool
-    status_code: int
-
-
 class Scraper:
     """Basisklasse, die jeder Shop-Scraper implementiert."""
 
@@ -80,42 +67,22 @@ class Scraper:
     def _get(self, url: str, params: dict | None = None) -> HttpResponse:
         """GET-Request mit Mindestabstand zwischen Requests (Rate-Limiting).
 
-        Nutzt den `curl`-Befehl statt der `requests`-Bibliothek: manche Shops
-        (z. B. Thalia) blocken den TLS-Fingerabdruck von Python-HTTP-Clients
-        per Cloudflare, unabhängig vom User-Agent-Header. curl mit demselben
-        ehrlichen User-Agent kommt durch, ohne einen Browser vorzutäuschen.
-
-        `--compressed` ist Pflicht: amazon.de liefert manche Antworten
-        unangefragt gzip-komprimiert. Ohne das Flag landen die rohen
-        gzip-Bytes in `text=True`/`encoding="utf-8"` und werden lautlos zu
-        Ersatzzeichen – live beobachtet, dabei sah eine echte "auf Lager"-
-        Antwort wie "nicht gefunden" aus. Für Shops ohne Kompression ändert
-        das Flag nichts.
+        Der Abstand wird je Scraper-Instanz gezählt, deshalb legen CLI und
+        Oberfläche die Scraper einmal an und verwenden sie für alle Bücher
+        einer Sammelabfrage weiter.
         """
-        if params:
-            url = f"{url}?{urlencode(params)}"
-
         if self._last_request_time is not None:
             wait = REQUEST_DELAY_SECONDS - (time.monotonic() - self._last_request_time)
             if wait > 0:
                 time.sleep(wait)
 
-        result = subprocess.run(
-            [
-                "curl", "-s", "-L", "--compressed", "--max-time", "10",
-                "-A", USER_AGENT, "-w", "\n%{http_code}", url,
-            ],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            creationflags=_OHNE_KONSOLENFENSTER,
-        )
-        self._last_request_time = time.monotonic()
-
-        body, _, status_text = result.stdout.rpartition("\n")
-        status_code = int(status_text) if status_text.isdigit() else 0
-        return HttpResponse(text=body, ok=200 <= status_code < 300, status_code=status_code)
+        try:
+            return hole(url, params)
+        finally:
+            # Auch ein Fehlschlag ging über die Leitung und zählt für den
+            # Mindestabstand – sonst würde ausgerechnet eine Fehlerserie
+            # ungebremst weiterlaufen.
+            self._last_request_time = time.monotonic()
 
     def scrape(self, isbn: str) -> ScrapeResult:
         raise NotImplementedError
