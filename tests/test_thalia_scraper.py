@@ -261,3 +261,14 @@ def test_osiander_scraper_uses_osiander_domain(monkeypatch):
     assert requested_urls[0].startswith("https://www.osiander.de/suche")
     assert requested_urls[1].startswith("https://www.osiander.de/shop/home/artikeldetails")
     assert result.url == "https://www.osiander.de/shop/home/artikeldetails/A1059470515"
+
+
+def test_euro_shop_ohne_originalpreis(monkeypatch):
+    """Nur Fremdwaehrungs-Shops fuellen die Originalfelder."""
+    responses = [FakeResponse(SEARCH_HTML_WITH_HIT), FakeResponse(DETAIL_HTML_WITH_PRICE)]
+    monkeypatch.setattr(OsianderScraper, "_get", lambda self, url, **kw: responses.pop(0))
+
+    result = OsianderScraper().scrape("9783831041657")
+
+    assert result.originalpreis is None
+    assert result.originalwaehrung is None

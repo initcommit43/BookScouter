@@ -24,6 +24,7 @@ from bs4 import BeautifulSoup
 
 from bookscouter.isbn import normalize_isbn, to_isbn13
 from bookscouter.scrapers.base import Scraper, ScrapeResult, verfuegbarkeit_aus_schema_org
+from bookscouter.waehrung import in_euro
 
 
 class ThaliaScraper(Scraper):
@@ -73,18 +74,38 @@ class ThaliaScraper(Scraper):
         if titel is None or preis_raw is None:
             return not_found
 
+        try:
+            preis_original = float(preis_raw)
+        except (TypeError, ValueError):
+            return not_found
+
+        # Shops ausserhalb der Eurozone zeichnen in fremder Währung aus, alle
+        # bisherigen Marken der Plattform in Euro. Umgerechnet wird generisch über
+        # `priceCurrency` statt am Shop-Namen festgemacht – so stimmt es
+        # automatisch, sobald eine solche Marke dazukommt.
+        waehrung = str(angebot.get("priceCurrency", "EUR")).upper()
+        preis = in_euro(preis_original, waehrung)
+        if preis is None:
+            # Fremdwährung ohne verfügbaren Kurs: ein fremder Betrag in einer
+            # Euro-Spalte wäre schlechter als kein Ergebnis, weil er den
+            # Preisvergleich still verfälschen würde.
+            return not_found
+
+        fremdwaehrung = waehrung != "EUR"
         return ScrapeResult(
             shop=self.shop_name,
             isbn=isbn,
             # Die Titel im JSON-LD enthalten HTML-Entities ("Die Stra&szlig;e"),
             # daher vor dem Speichern/Anzeigen dekodieren.
             titel=html.unescape(titel),
-            preis=float(preis_raw),
+            preis=preis,
             gefunden=True,
             verfuegbarkeit=verfuegbarkeit_aus_schema_org(angebot.get("availability")),
             # Die gerade abgerufene Detailseite ist zugleich die Produktseite
             # für den Link – identisch mit dem `url`-Feld des JSON-LD.
             url=detail_url,
+            originalpreis=preis_original if fremdwaehrung else None,
+            originalwaehrung=waehrung if fremdwaehrung else None,
         )
 
     @staticmethod

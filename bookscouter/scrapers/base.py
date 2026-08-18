@@ -54,6 +54,14 @@ class ScrapeResult:
     verfuegbarkeit: str = VERFUEGBARKEIT_UNBEKANNT
     # Produktseite beim Shop, in der Oberfläche als Link hinterlegt.
     url: str | None = None
+    # Nur gesetzt, wenn der Shop in einer anderen Währung als Euro auszeichnet
+    # (bisher allein Orell Füssli in CHF). `preis` ist dann der umgerechnete
+    # Euro-Betrag, damit Vergleich, Chart und Historie eine einzige Einheit
+    # behalten; hier steht zusätzlich der Originalbetrag, damit die Anzeige
+    # offenlegen kann, dass ein Wechselkurs im Spiel war, statt eine
+    # umgerechnete Zahl als Ladenpreis auszugeben.
+    originalpreis: float | None = None
+    originalwaehrung: str | None = None
 
 
 class Scraper:

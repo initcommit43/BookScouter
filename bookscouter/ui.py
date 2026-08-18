@@ -70,6 +70,21 @@ def format_preis(wert: float) -> str:
     return f"{wert:.2f} €".replace(".", ",")
 
 
+def format_preis_mit_original(ergebnis) -> str:
+    """Preis fürs Ergebnisraster, bei Fremdwährung mit dem Originalbetrag.
+
+    Orell Füssli zeichnet in Franken aus und wird für den Vergleich in Euro
+    umgerechnet. Der Euro-Betrag steht deshalb vorn (nur so ist die Spalte
+    untereinander vergleichbar), der tatsächliche Ladenpreis in Klammern
+    dahinter – sonst stünde dort eine Zahl, die im Shop nirgends auftaucht.
+    """
+    text = format_preis(ergebnis.preis)
+    if ergebnis.originalwaehrung and ergebnis.originalpreis is not None:
+        original = f"{ergebnis.originalpreis:.2f}".replace(".", ",")
+        text += f" ({original} {ergebnis.originalwaehrung})"
+    return text
+
+
 def shop_namen() -> list[str]:
     """Anzeigenamen aller Shops in der Reihenfolge von ALL_SCRAPERS."""
     return [scraper_cls().shop_name for scraper_cls in ALL_SCRAPERS]
@@ -665,7 +680,7 @@ class BookScouterApp(ctk.CTk):
 
         self._zelle(0, ergebnis.shop)
         self._zelle(1, ergebnis.titel)
-        self._zelle(2, format_preis(ergebnis.preis),
+        self._zelle(2, format_preis_mit_original(ergebnis),
                     font=ctk.CTkFont(size=13, weight="bold"))
 
         # Der frühere Preis selbst steht im Diagramm; hier genügt die

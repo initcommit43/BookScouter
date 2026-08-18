@@ -58,7 +58,14 @@ def _frage_buch_ab(conn, scraper: list, isbn: str) -> bool:
             continue
 
         gefunden = True
-        print(f"{result.titel} - {result.shop}: {result.preis:.2f} EUR – {result.verfuegbarkeit}")
+        preis_text = f"{result.preis:.2f} EUR"
+        if result.originalwaehrung:
+            # Nicht verschweigen, dass hier ein Wechselkurs im Spiel war –
+            # der Ladenpreis ist der Betrag in Klammern, nicht der Euro-Wert.
+            preis_text += (
+                f" (umgerechnet aus {result.originalpreis:.2f} {result.originalwaehrung})"
+            )
+        print(f"{result.titel} - {result.shop}: {preis_text} – {result.verfuegbarkeit}")
         if result.url:
             print(f"  {result.url}")
         save_lookup(conn, isbn=isbn, titel=result.titel, shop=result.shop, preis=result.preis)

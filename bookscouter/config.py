@@ -27,3 +27,8 @@ def _daten_verzeichnis() -> Path:
 
 
 DB_PATH = str(_daten_verzeichnis() / "bookscouter.db")
+
+# Zuletzt geholte EZB-Wechselkurse, damit die App nicht bei jedem Start und
+# schon gar nicht bei jeder Abfrage neu nachschlägt – und offline weiter
+# rechnen kann. Liegt aus demselben Grund wie die Datenbank im Benutzerprofil.
+KURS_CACHE_PATH = str(_daten_verzeichnis() / "wechselkurse.json")
