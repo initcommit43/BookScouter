@@ -1,9 +1,10 @@
 """Scraper für die Thalia-Plattform: ISBN rein, Titel + Preis raus.
 
-Deckt thalia.at, thalia.de, buecher.de und osiander.de ab. Alle vier laufen
-auf derselben Plattform (identische Struktur bis hin zu denselben
-Artikel-IDs, Bilder von images.thalia.media – teils aber unterschiedliche
-Preise), daher ein parametrisierter Scraper statt vier Kopien. Ein weiterer Shop dieser Familie kostet entsprechend nur eine
+Deckt thalia.at, thalia.de, buecher.de, osiander.de und orellfuessli.ch ab.
+Alle fünf laufen auf derselben Plattform (identische Struktur bis hin zu
+denselben Artikel-IDs, Bilder von images.thalia.media – teils aber
+unterschiedliche Preise), daher ein parametrisierter Scraper statt fünf
+Kopien. Ein weiterer Shop dieser Familie kostet entsprechend nur eine
 Unterklasse mit anderer Basis-URL, keine Zeile Parsing-Code.
 
 Nicht auf dieser Plattform, obwohl es naheliegt: hugendubel.de, weltbild.de,
@@ -79,14 +80,14 @@ class ThaliaScraper(Scraper):
         except (TypeError, ValueError):
             return not_found
 
-        # Shops ausserhalb der Eurozone zeichnen in fremder Währung aus, alle
-        # bisherigen Marken der Plattform in Euro. Umgerechnet wird generisch über
-        # `priceCurrency` statt am Shop-Namen festgemacht – so stimmt es
-        # automatisch, sobald eine solche Marke dazukommt.
+        # Orell Füssli zeichnet in Franken aus, alle übrigen Marken der
+        # Plattform in Euro. Umgerechnet wird deshalb generisch über
+        # `priceCurrency` statt am Shop-Namen festgemacht – so stimmt es auch,
+        # falls eine weitere Marke ausserhalb der Eurozone dazukommt.
         waehrung = str(angebot.get("priceCurrency", "EUR")).upper()
         preis = in_euro(preis_original, waehrung)
         if preis is None:
-            # Fremdwährung ohne verfügbaren Kurs: ein fremder Betrag in einer
+            # Fremdwährung ohne verfügbaren Kurs: ein Franken-Betrag in einer
             # Euro-Spalte wäre schlechter als kein Ergebnis, weil er den
             # Preisvergleich still verfälschen würde.
             return not_found
@@ -167,3 +168,14 @@ class OsianderScraper(ThaliaScraper):
     def __init__(self) -> None:
         super().__init__(base_url="https://www.osiander.de", shop_name="Osiander.de")
 
+
+class OrellFuessliScraper(ThaliaScraper):
+    """orellfuessli.ch – Schweizer Marke der Thalia-Gruppe, rechnet in CHF.
+
+    Der einzige Shop des Projekts ausserhalb der Eurozone. Sein JSON-LD meldet
+    `priceCurrency: "CHF"`; die Umrechnung übernimmt die Basisklasse, siehe
+    dort und `bookscouter/waehrung.py`.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(base_url="https://www.orellfuessli.ch", shop_name="Orell Füssli")

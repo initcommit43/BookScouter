@@ -9,6 +9,7 @@ from bookscouter.scrapers.base import Scraper, ScrapeResult
 from bookscouter.scrapers.morawa import MorawaScraper
 from bookscouter.scrapers.thalia import (
     BuecherDeScraper,
+    OrellFuessliScraper,
     OsianderScraper,
     ThaliaDeScraper,
     ThaliaScraper,
@@ -27,6 +28,7 @@ ALL_SCRAPERS = [
     WaltsComicShopScraper,
     AmazonScraper,
     OsianderScraper,
+    OrellFuessliScraper,
 ]
 
 __all__ = [
@@ -34,6 +36,7 @@ __all__ = [
     "AmazonScraper",
     "BuecherDeScraper",
     "MorawaScraper",
+    "OrellFuessliScraper",
     "OsianderScraper",
     "Scraper",
     "ScrapeResult",

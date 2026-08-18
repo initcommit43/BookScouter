@@ -5,6 +5,7 @@ import pytest
 from bookscouter.scrapers.base import VERFUEGBARKEIT_UNBEKANNT
 from bookscouter.scrapers.thalia import (
     BuecherDeScraper,
+    OrellFuessliScraper,
     OsianderScraper,
     ThaliaDeScraper,
     ThaliaScraper,
@@ -242,6 +243,10 @@ def test_buecherde_scraper_uses_buecherde_domain(monkeypatch):
     assert requested_urls[1].startswith("https://www.buecher.de/shop/home/artikeldetails")
 
 
+DETAIL_HTML_IN_CHF = DETAIL_HTML_WITH_PRICE.replace(
+    '"priceCurrency": "EUR"', '"priceCurrency": "CHF"'
+).replace('"price": "13.90"', '"price": "38.90"')
+
 
 def test_osiander_scraper_uses_osiander_domain(monkeypatch):
     requested_urls = []
@@ -272,3 +277,40 @@ def test_euro_shop_ohne_originalpreis(monkeypatch):
 
     assert result.originalpreis is None
     assert result.originalwaehrung is None
+
+
+def test_orellfuessli_rechnet_chf_in_euro_um(monkeypatch):
+    """Der Preis muss in Euro vergleichbar sein, der Franken-Betrag erhalten bleiben."""
+    from bookscouter.scrapers import thalia
+
+    requested_urls = []
+    responses = [FakeResponse(SEARCH_HTML_WITH_HIT), FakeResponse(DETAIL_HTML_IN_CHF)]
+
+    def fake_get(self, url, **kwargs):
+        requested_urls.append(url)
+        return responses.pop(0)
+
+    monkeypatch.setattr(OrellFuessliScraper, "_get", fake_get)
+    monkeypatch.setattr(thalia, "in_euro", lambda betrag, waehrung: betrag / 0.9406)
+
+    result = OrellFuessliScraper().scrape("9783831041657")
+
+    assert result.shop == "Orell Füssli"
+    assert result.gefunden is True
+    assert result.preis == pytest.approx(41.36, abs=0.01)
+    assert result.originalpreis == 38.90
+    assert result.originalwaehrung == "CHF"
+    assert requested_urls[0].startswith("https://www.orellfuessli.ch/suche")
+
+
+def test_orellfuessli_ohne_kurs_nicht_gefunden(monkeypatch):
+    """Lieber kein Ergebnis als ein Franken-Betrag in der Euro-Spalte."""
+    from bookscouter.scrapers import thalia
+
+    responses = [FakeResponse(SEARCH_HTML_WITH_HIT), FakeResponse(DETAIL_HTML_IN_CHF)]
+    monkeypatch.setattr(
+        OrellFuessliScraper, "_get", lambda self, url, **kw: responses.pop(0)
+    )
+    monkeypatch.setattr(thalia, "in_euro", lambda betrag, waehrung: None)
+
+    assert OrellFuessliScraper().scrape("9783831041657").gefunden is False
