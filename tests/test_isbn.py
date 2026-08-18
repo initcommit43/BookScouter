@@ -1,4 +1,12 @@
-from bookscouter.isbn import normalize_isbn, parse_isbn_liste, to_isbn10, to_isbn13
+import pytest
+
+from bookscouter.isbn import (
+    hyphenate_isbn13,
+    normalize_isbn,
+    parse_isbn_liste,
+    to_isbn10,
+    to_isbn13,
+)
 
 
 def test_removes_hyphens():
@@ -129,3 +137,44 @@ def test_parse_liste_reicht_unsinn_durch():
     assert parse_isbn_liste("keine-isbn\n9783546100335") == [
         "KEINEISBN", "9783546100335",
     ]
+
+
+# Alle sechs Paare stammen von echten Produktseiten der jeweiligen Verlage –
+# die Bindestriche sind also nicht aus der Tabelle zurueckgerechnet, sondern
+# gegen die veroeffentlichte Schreibweise geprueft.
+@pytest.mark.parametrize(
+    "isbn13, erwartet",
+    [
+        ("9783963581526", "978-3-96358-152-6"),   # altraverse, Verlagsnummer 5-stellig
+        ("9783959560009", "978-3-95956-000-9"),   # dani books, 5-stellig
+        ("9783551741035", "978-3-551-74103-5"),   # Carlsen, 3-stellig
+        ("9783546100335", "978-3-546-10033-5"),   # Ullstein, 3-stellig
+        ("9783831041657", "978-3-8310-4165-7"),   # Dorling Kindersley, 4-stellig
+        ("9783753914107", "978-3-7539-1410-7"),   # altraverse, 4-stellig
+    ],
+)
+def test_hyphenate_isbn13(isbn13, erwartet):
+    assert hyphenate_isbn13(isbn13) == erwartet
+
+
+def test_hyphenate_akzeptiert_isbn10():
+    """Eine ISBN-10-Eingabe wird vorher auf ISBN-13 gebracht."""
+    assert hyphenate_isbn13("3959560001") == "978-3-95956-000-9"
+
+
+def test_hyphenate_akzeptiert_bereits_getrennte_eingabe():
+    assert hyphenate_isbn13("978-3-96358-152-6") == "978-3-96358-152-6"
+
+
+@pytest.mark.parametrize(
+    "fremd",
+    [
+        "9780306406157",   # englischsprachige Gruppe 978-0
+        "9791234567896",   # 979er-Nummernraum, hat keine Gruppe 3
+        "9784088820934",   # japanische Gruppe 978-4
+        "keine-isbn",
+    ],
+)
+def test_hyphenate_nur_fuer_deutsche_gruppe(fremd):
+    """Ausserhalb 978-3 lieber None als eine geratene Schreibweise."""
+    assert hyphenate_isbn13(fremd) is None

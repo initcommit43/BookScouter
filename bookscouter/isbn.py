@@ -75,6 +75,63 @@ def to_isbn10(isbn: str) -> str | None:
     return kern + pruefziffer
 
 
+# Registrant-Bereiche der deutschsprachigen ISBN-Gruppe 978-3, wie sie
+# ISBN International in der offiziellen "RangeMessage" veröffentlicht. Je
+# Eintrag: unterste und oberste Kennung des Bereichs sowie die Länge der
+# Verlagsnummer. Die Grenzen sind gleich lang, deshalb genügt ein
+# Zeichenketten-Vergleich – "7000" <= "7539" <= "8499" ist als Text dasselbe
+# Ergebnis wie als Zahl, solange nicht unterschiedlich lange Werte verglichen
+# werden.
+_GRUPPE_3_BEREICHE = (
+    ("00", "02", 2),
+    ("030", "033", 3),
+    ("0340", "0369", 4),
+    ("03700", "03799", 5),
+    ("0380", "0399", 4),
+    ("04", "19", 2),
+    ("200", "699", 3),
+    ("7000", "8499", 4),
+    ("85000", "89999", 5),
+    ("900000", "949999", 6),
+    ("9500000", "9539999", 7),
+    ("95400", "96999", 5),
+    ("9700000", "9899999", 7),
+    ("99000", "99499", 5),
+    ("99500", "99999", 5),
+)
+
+
+def hyphenate_isbn13(isbn: str) -> str | None:
+    """Setzt die Bindestriche einer deutschsprachigen ISBN (Gruppe 978-3).
+
+    Gebraucht für altraverse: dessen Suche findet eine ISBN ausschliesslich
+    in der amtlichen Schreibweise mit Bindestrichen ("978-3-96358-152-6").
+    Weder die reine Ziffernfolge noch willkürlich gesetzte Bindestriche
+    liefern dort einen Treffer – live geprüft.
+
+    Wo die Trennstriche stehen, hängt von der Länge der Verlagsnummer ab,
+    und die ist nicht aus der ISBN ablesbar, sondern nur über die
+    Bereichstabelle der Vergabestelle. Deshalb `_GRUPPE_3_BEREICHE`.
+
+    Nur die Gruppe 978-3 wird abgedeckt; alles andere ergibt `None` – wie
+    schon bei `to_isbn10()` ist ein klares Signal besser als eine geratene
+    Zeichenkette, und der einzige Aufrufer verlegt ausschliesslich
+    deutschsprachige Titel. Eine ISBN-10 wird vorher umgerechnet, damit auch
+    sie funktioniert.
+    """
+    isbn = to_isbn13(isbn)
+    if len(isbn) != 13 or not isbn.isdigit() or not isbn.startswith("9783"):
+        return None
+
+    # Ziffern 5 bis 12: Verlagsnummer und Titelnummer, ohne Präfix und ohne
+    # Prüfziffer. Wo die Grenze zwischen beiden liegt, sagt die Tabelle.
+    rest = isbn[4:12]
+    for von, bis, laenge in _GRUPPE_3_BEREICHE:
+        if von <= rest[: len(von)] <= bis:
+            return f"978-3-{rest[:laenge]}-{rest[laenge:]}-{isbn[12]}"
+    return None
+
+
 def parse_isbn_liste(text: str) -> list[str]:
     """Zerlegt eine Eingabe mit mehreren ISBNs in eine Liste von ISBN-13.
 
