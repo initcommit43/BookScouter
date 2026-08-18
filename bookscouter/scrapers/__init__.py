@@ -4,6 +4,7 @@ Damit CLI und UI dieselbe Liste verwenden und ein neuer Shop nur hier
 eingetragen werden muss.
 """
 
+from bookscouter.scrapers.altraverse import AltraverseScraper
 from bookscouter.scrapers.amazon import AmazonScraper
 from bookscouter.scrapers.base import Scraper, ScrapeResult
 from bookscouter.scrapers.danibooks import DaniBooksScraper
@@ -31,10 +32,12 @@ ALL_SCRAPERS = [
     OsianderScraper,
     OrellFuessliScraper,
     DaniBooksScraper,
+    AltraverseScraper,
 ]
 
 __all__ = [
     "ALL_SCRAPERS",
+    "AltraverseScraper",
     "AmazonScraper",
     "BuecherDeScraper",
     "DaniBooksScraper",
