@@ -7,9 +7,18 @@ eingetragen werden muss.
 from bookscouter.scrapers.amazon import AmazonScraper
 from bookscouter.scrapers.base import Scraper, ScrapeResult
 from bookscouter.scrapers.morawa import MorawaScraper
-from bookscouter.scrapers.thalia import BuecherDeScraper, ThaliaDeScraper, ThaliaScraper
+from bookscouter.scrapers.thalia import (
+    BuecherDeScraper,
+    OsianderScraper,
+    ThaliaDeScraper,
+    ThaliaScraper,
+)
 from bookscouter.scrapers.waltscomicshop import WaltsComicShopScraper
 
+# Die Reihenfolge ist nicht kosmetisch: sie bestimmt die Reihenfolge der
+# Shop-Checkboxen in der Oberfläche und die Farbzuordnung im Preisverlauf.
+# Neue Shops deshalb hinten anhängen – wer vorne einfügt, verschiebt die
+# Farben aller bestehenden Linien.
 ALL_SCRAPERS = [
     ThaliaScraper,
     ThaliaDeScraper,
@@ -17,6 +26,7 @@ ALL_SCRAPERS = [
     MorawaScraper,
     WaltsComicShopScraper,
     AmazonScraper,
+    OsianderScraper,
 ]
 
 __all__ = [
@@ -24,6 +34,7 @@ __all__ = [
     "AmazonScraper",
     "BuecherDeScraper",
     "MorawaScraper",
+    "OsianderScraper",
     "Scraper",
     "ScrapeResult",
     "ThaliaDeScraper",

@@ -1,9 +1,13 @@
 """Scraper für die Thalia-Plattform: ISBN rein, Titel + Preis raus.
 
-Deckt thalia.at, thalia.de und buecher.de ab. Alle drei laufen auf derselben
-Plattform (identische Struktur bis hin zu denselben Artikel-IDs, Bilder von
-images.thalia.media – teils aber unterschiedliche Preise), daher ein
-parametrisierter Scraper statt drei Kopien.
+Deckt thalia.at, thalia.de, buecher.de und osiander.de ab. Alle vier laufen
+auf derselben Plattform (identische Struktur bis hin zu denselben
+Artikel-IDs, Bilder von images.thalia.media – teils aber unterschiedliche
+Preise), daher ein parametrisierter Scraper statt vier Kopien. Ein weiterer Shop dieser Familie kostet entsprechend nur eine
+Unterklasse mit anderer Basis-URL, keine Zeile Parsing-Code.
+
+Nicht auf dieser Plattform, obwohl es naheliegt: hugendubel.de, weltbild.de,
+buch.de und mayersche.de – dort führt /suche?sq=<isbn> zu keinem Treffer.
 
 Thalia bietet keine ISBN-basierte Produkt-URL an. Der einzige Weg, eine ISBN
 einer Produktseite zuzuordnen, ist die Trefferliste unter /suche?sq=<isbn>.
@@ -134,3 +138,11 @@ class BuecherDeScraper(ThaliaScraper):
 
     def __init__(self) -> None:
         super().__init__(base_url="https://www.buecher.de", shop_name="Buecher.de")
+
+
+class OsianderScraper(ThaliaScraper):
+    """osiander.de – süddeutsche Buchhandelskette auf derselben Plattform."""
+
+    def __init__(self) -> None:
+        super().__init__(base_url="https://www.osiander.de", shop_name="Osiander.de")
+

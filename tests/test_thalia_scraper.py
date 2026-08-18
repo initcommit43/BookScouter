@@ -1,7 +1,14 @@
 from dataclasses import dataclass
 
+import pytest
+
 from bookscouter.scrapers.base import VERFUEGBARKEIT_UNBEKANNT
-from bookscouter.scrapers.thalia import BuecherDeScraper, ThaliaDeScraper, ThaliaScraper
+from bookscouter.scrapers.thalia import (
+    BuecherDeScraper,
+    OsianderScraper,
+    ThaliaDeScraper,
+    ThaliaScraper,
+)
 
 SEARCH_HTML_WITH_HIT = """
 <html><body>
@@ -233,3 +240,24 @@ def test_buecherde_scraper_uses_buecherde_domain(monkeypatch):
     assert result.gefunden is True
     assert requested_urls[0].startswith("https://www.buecher.de/suche")
     assert requested_urls[1].startswith("https://www.buecher.de/shop/home/artikeldetails")
+
+
+
+def test_osiander_scraper_uses_osiander_domain(monkeypatch):
+    requested_urls = []
+    responses = [FakeResponse(SEARCH_HTML_WITH_HIT), FakeResponse(DETAIL_HTML_WITH_PRICE)]
+
+    def fake_get(self, url, **kwargs):
+        requested_urls.append(url)
+        return responses.pop(0)
+
+    monkeypatch.setattr(OsianderScraper, "_get", fake_get)
+
+    result = OsianderScraper().scrape("9783831041657")
+
+    assert result.shop == "Osiander.de"
+    assert result.gefunden is True
+    assert result.preis == 13.90
+    assert requested_urls[0].startswith("https://www.osiander.de/suche")
+    assert requested_urls[1].startswith("https://www.osiander.de/shop/home/artikeldetails")
+    assert result.url == "https://www.osiander.de/shop/home/artikeldetails/A1059470515"
