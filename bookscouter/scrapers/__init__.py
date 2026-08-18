@@ -6,6 +6,7 @@ eingetragen werden muss.
 
 from bookscouter.scrapers.amazon import AmazonScraper
 from bookscouter.scrapers.base import Scraper, ScrapeResult
+from bookscouter.scrapers.danibooks import DaniBooksScraper
 from bookscouter.scrapers.morawa import MorawaScraper
 from bookscouter.scrapers.thalia import (
     BuecherDeScraper,
@@ -29,12 +30,14 @@ ALL_SCRAPERS = [
     AmazonScraper,
     OsianderScraper,
     OrellFuessliScraper,
+    DaniBooksScraper,
 ]
 
 __all__ = [
     "ALL_SCRAPERS",
     "AmazonScraper",
     "BuecherDeScraper",
+    "DaniBooksScraper",
     "MorawaScraper",
     "OrellFuessliScraper",
     "OsianderScraper",
