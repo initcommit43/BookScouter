@@ -20,6 +20,7 @@ from bookscouter.scrapers.thalia import (
     ThaliaScraper,
 )
 from bookscouter.scrapers.waltscomicshop import WaltsComicShopScraper
+from bookscouter.scrapers.wordery import WorderyScraper
 
 # Die Reihenfolge ist nicht kosmetisch: sie bestimmt die Reihenfolge der
 # Shop-Checkboxen in der Oberfläche und die Farbzuordnung im Preisverlauf.
@@ -39,6 +40,7 @@ ALL_SCRAPERS = [
     LehmannsScraper,
     Buch7Scraper,
     BlackwellsScraper,
+    WorderyScraper,
 ]
 
 __all__ = [
@@ -58,4 +60,5 @@ __all__ = [
     "ThaliaDeScraper",
     "ThaliaScraper",
     "WaltsComicShopScraper",
+    "WorderyScraper",
 ]
