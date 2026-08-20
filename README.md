@@ -4,7 +4,7 @@ A local desktop tool for entering a book ISBN and seeing prices across
 several online shops at a glance. Every lookup is stored locally, so price
 history for a title can be tracked over time.
 
-> **Status:** Works end-to-end against ten live shops, through the graphical
+> **Status:** Works end-to-end against 14 live shops, through the graphical
 > interface, the command line, and a standalone Windows `.exe`.
 
 ## Why this project
@@ -27,6 +27,15 @@ a local record of what each title has cost.
 - altraverse.de — manga publisher selling direct; only carries
   German-language ISBNs (`978-3-…`), so other ISBNs are skipped without a
   request
+- lehmanns.de — general bookseller; reached through a search path its
+  robots.txt disallows, because the product URL contains an internal article
+  number and is not derivable from the ISBN (see
+  `bookscouter/scrapers/lehmanns.py`)
+- buch7.de — general bookseller donating most of its profit
+- blackwells.co.uk — British bookseller with a large English-language manga
+  and light novel range; prices depend on your location, see
+  [Currencies](#currencies)
+- wordery.com — British bookseller, likewise English-language; quotes pounds
 - amazon.de — verified against the live site, but Amazon's terms explicitly
   prohibit automated access (unlike the others, which only have a
   robots.txt courtesy exception, see `bookscouter/scrapers/amazon.py`); weigh
@@ -38,20 +47,34 @@ thalia.at, thalia.de, buecher.de, osiander.de and orellfuessli.ch — run on
 the same shop platform and share one scraper, so each is only a subclass
 naming its own domain.
 
+### A note on German fixed book prices
+
+German law binds the retail price of German-published books, so thalia.de,
+buecher.de, osiander.de, lehmanns.de and buch7.de will all quote the same
+figure for, say, a Carlsen manga. That is not a bug in the comparison — it is
+the law, and seeing it confirmed is itself useful. Where these shops do
+differ is availability and delivery time, and neither imported nor
+English-language editions are price-bound. Blackwell's and Wordery are the
+two shops where manga prices genuinely move: for the same volume they can sit
+several euros apart, and apart from both from the German retailers.
+
 ## Currencies
 
 Every price is stored and compared in euros, so one column and one chart axis
-mean the same thing everywhere. Orell Füssli is the only shop outside the
-euro area; its franc prices are converted using the European Central Bank's
-daily reference rates, fetched at most once a day and cached in your user
-profile so the app still works offline.
+mean the same thing everywhere. Three shops sit outside the euro area: Orell
+Füssli quotes Swiss francs, Wordery quotes pounds, and Blackwell's quotes
+whichever currency it picks for your location — euros from inside the euro
+area, pounds otherwise. All of them are converted using the European Central
+Bank's daily reference rates, fetched at most once a day and cached in your
+user profile so the app still works offline.
 
 Converted rows always show the shop's own price too — `31.79 EUR (umgerechnet
-aus 29.90 CHF)` — because the franc amount is the actual shelf price. Bear in
-mind that stored history keeps the euro value from the day of the lookup, so
-an old Orell Füssli entry reflects that day's exchange rate as well as that
-day's price. If no rate can be fetched and none was ever cached, that shop
-reports no result rather than passing a franc amount off as euros.
+aus 29.90 CHF)` — because the foreign amount is the actual shelf price. Bear
+in mind that stored history keeps the euro value from the day of the lookup,
+so an old Orell Füssli entry reflects that day's exchange rate as well as
+that day's price. If no rate can be fetched and none was ever cached, that
+shop reports no result rather than passing a franc or pound amount off as
+euros.
 
 ## Requirements
 
@@ -95,7 +118,7 @@ python -m bookscouter.ui
 Enter an ISBN (hyphens and spaces are fine) and press Enter or click
 **Suchen**. Shops are queried one after another and each result appears as
 soon as that shop answers, so the window stays responsive throughout the
-roughly twenty seconds a full lookup across all ten shops takes.
+roughly half a minute a full lookup across all 14 shops takes.
 
 A checkbox per shop sits under the input field. All of them start ticked;
 unticking one leaves it out of the next lookup, which is the quickest way to
