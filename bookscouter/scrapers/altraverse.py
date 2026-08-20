@@ -23,7 +23,12 @@ darunter, ist für `User-agent: *` also ausdrücklich erlaubt.
 from bs4 import BeautifulSoup
 
 from bookscouter.isbn import hyphenate_isbn13, normalize_isbn, to_isbn13
-from bookscouter.scrapers.base import Scraper, ScrapeResult, verfuegbarkeit_aus_schema_org
+from bookscouter.scrapers.base import (
+    Scraper,
+    ScrapeResult,
+    microdata,
+    verfuegbarkeit_aus_schema_org,
+)
 
 
 class AltraverseScraper(Scraper):
@@ -72,7 +77,7 @@ class AltraverseScraper(Scraper):
 
         # Absicherung gegen falsch zugeordnete Treffer: die Suche ist unscharf
         # und liefert notfalls einen anderen Band derselben Reihe.
-        seiten_isbn = _microdata(detail_soup, "productISBN")
+        seiten_isbn = microdata(detail_soup, "productISBN")
         if seiten_isbn is None or normalize_isbn(seiten_isbn) != to_isbn13(isbn):
             return not_found
 
@@ -80,7 +85,7 @@ class AltraverseScraper(Scraper):
         # letzteres trägt auf dieser Seite den Hersteller ("altraverse").
         ueberschrift = detail_soup.select_one("h1")
         titel = ueberschrift.get_text(strip=True) if ueberschrift else None
-        preis = _microdata(detail_soup, "price")
+        preis = microdata(detail_soup, "price")
         if not titel or preis is None:
             return not_found
 
@@ -96,22 +101,7 @@ class AltraverseScraper(Scraper):
             preis=preis,
             gefunden=True,
             verfuegbarkeit=verfuegbarkeit_aus_schema_org(
-                _microdata(detail_soup, "availability")
+                microdata(detail_soup, "availability")
             ),
             url=detail_url,
         )
-
-
-def _microdata(soup: BeautifulSoup, name: str) -> str | None:
-    """Liest ein `itemprop`-Feld aus dem Markup.
-
-    Shopware verteilt den Wert je nach Feld auf zwei verschiedene Attribute:
-    Preis und ISBN stehen in `content`, die Verfügbarkeit dagegen als
-    `<link itemprop="availability" href="http://schema.org/InStock" />` im
-    `href`. Deshalb beide Attribute prüfen – sonst käme die Lagerinformation
-    still als "Unbekannt" durch, obwohl die Seite sie nennt.
-    """
-    element = soup.select_one(f'[itemprop="{name}"]')
-    if element is None:
-        return None
-    return element.get("content") or element.get("href")

@@ -24,6 +24,12 @@ class HttpResponse:
     text: str
     ok: bool
     status_code: int
+    # Die URL, bei der curl nach allen Weiterleitungen gelandet ist. Mehrere
+    # Shops (Lehmanns, buch7, Wordery) beantworten eine ISBN-Suche mit einer
+    # Weiterleitung auf die Produktseite; deren Adresse ist erst danach
+    # bekannt, wird aber als Link im Ergebnis gebraucht. Mit Vorgabewert,
+    # damit Aufrufer, die sie nicht brauchen, unverändert bleiben.
+    url: str = ""
 
 
 def hole(url: str, params: dict | None = None) -> HttpResponse:
@@ -33,6 +39,10 @@ def hole(url: str, params: dict | None = None) -> HttpResponse:
     (z. B. Thalia) blocken den TLS-Fingerabdruck von Python-HTTP-Clients
     per Cloudflare, unabhängig vom User-Agent-Header. curl mit demselben
     ehrlichen User-Agent kommt durch, ohne einen Browser vorzutäuschen.
+
+    Das `-w`-Format hängt zwei Zeilen an den Body an: Statuscode und
+    schliesslich erreichte URL. Beide werden von hinten abgeschnitten, denn
+    der Body selbst enthält reichlich Zeilenumbrüche.
 
     `--compressed` ist Pflicht: amazon.de liefert manche Antworten
     unangefragt gzip-komprimiert. Ohne das Flag landen die rohen
@@ -47,7 +57,7 @@ def hole(url: str, params: dict | None = None) -> HttpResponse:
     result = subprocess.run(
         [
             "curl", "-s", "-L", "--compressed", "--max-time", "10",
-            "-A", USER_AGENT, "-w", "\n%{http_code}", url,
+            "-A", USER_AGENT, "-w", "\n%{http_code}\n%{url_effective}", url,
         ],
         capture_output=True,
         text=True,
@@ -56,6 +66,15 @@ def hole(url: str, params: dict | None = None) -> HttpResponse:
         creationflags=_OHNE_KONSOLENFENSTER,
     )
 
-    body, _, status_text = result.stdout.rpartition("\n")
+    ohne_url, _, effektive_url = result.stdout.rpartition("\n")
+    body, _, status_text = ohne_url.rpartition("\n")
     status_code = int(status_text) if status_text.isdigit() else 0
-    return HttpResponse(text=body, ok=200 <= status_code < 300, status_code=status_code)
+    return HttpResponse(
+        text=body,
+        ok=200 <= status_code < 300,
+        status_code=status_code,
+        # Bei einem Verbindungsfehler schreibt curl nichts auf die Standard-
+        # ausgabe; dann bleibt die angefragte URL stehen statt einer leeren
+        # Zeichenkette – für den Aufrufer die brauchbarere Auskunft.
+        url=effektive_url.strip() or url,
+    )
