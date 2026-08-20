@@ -8,6 +8,7 @@ from bookscouter.scrapers.altraverse import AltraverseScraper
 from bookscouter.scrapers.amazon import AmazonScraper
 from bookscouter.scrapers.base import Scraper, ScrapeResult
 from bookscouter.scrapers.danibooks import DaniBooksScraper
+from bookscouter.scrapers.lehmanns import LehmannsScraper
 from bookscouter.scrapers.morawa import MorawaScraper
 from bookscouter.scrapers.thalia import (
     BuecherDeScraper,
@@ -33,6 +34,7 @@ ALL_SCRAPERS = [
     OrellFuessliScraper,
     DaniBooksScraper,
     AltraverseScraper,
+    LehmannsScraper,
 ]
 
 __all__ = [
@@ -41,6 +43,7 @@ __all__ = [
     "AmazonScraper",
     "BuecherDeScraper",
     "DaniBooksScraper",
+    "LehmannsScraper",
     "MorawaScraper",
     "OrellFuessliScraper",
     "OsianderScraper",
